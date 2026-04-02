@@ -1,4 +1,4 @@
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) # Executive School Oversight System (ESOS)
+# Executive School Oversight System (ESOS) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) 
 ## Platform Specification & Functional Description 
 
 The **Executive School Oversight System (ESOS)** is a specialized "Data-Lite" Management Information System (MIS) designed for school proprietors who manage their institutions remotely. Built on a high-performance **Django** backend, the platform transforms raw administrative data into a high-level **Strategic Dashboard**, allowing for "eyes-on" management from any distance.
