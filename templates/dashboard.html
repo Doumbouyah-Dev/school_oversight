@@ -294,7 +294,7 @@
           <div class="icon-wrap" style="background:#f0fdf4;color:#28a745;"><i class="bi bi-cash-coin"></i></div>
           <div class="metric-value">{{ collection_rate }}%</div>
           <div class="metric-label">Collection Rate</div>
-          <div class="metric-sub">₦{{ total_paid|floatformat:0 }} of ₦{{ total_due|floatformat:0 }}</div>
+          <div class="metric-sub">L${{ total_paid|floatformat:0 }} of L${{ total_due|floatformat:0 }}</div>
         </div>
       </div>
 
@@ -611,7 +611,7 @@
 
                   <!-- Fees Due -->
                   <td {% if sort_by == 'due' %}class="col-sort"{% endif %}>
-                    ₦{{ record.total_fees_due|floatformat:0 }}
+                    L${{ record.total_fees_due|floatformat:0 }}
                   </td>
 
                   <!-- Amount Paid -->
@@ -620,7 +620,7 @@
                       color:{% if record.payment_status == 'fully_paid' %}#065f46
                             {% elif record.payment_status == 'partial'   %}#92400e
                             {% else %}#991b1b{% endif %};">
-                      ₦{{ record.amount_paid|floatformat:0 }}
+                      L${{ record.amount_paid|floatformat:0 }}
                     </span>
                   </td>
 
@@ -629,7 +629,7 @@
                     <span style="font-weight:600;
                       color:{% if record.payment_status == 'fully_paid' %}#065f46
                             {% else %}#dc2626{% endif %};">
-                      ₦{{ record.computed_balance|floatformat:0 }}
+                      L${{ record.computed_balance|floatformat:0 }}
                     </span>
                   </td>
 
@@ -668,9 +668,9 @@
                     {{ finance_count }} record{{ finance_count|pluralize }}
                     {% if finance_search %}(filtered){% endif %}
                   </td>
-                  <td style="color:#1e293b;">₦{{ total_due|floatformat:0 }}</td>
-                  <td style="color:#065f46;">₦{{ total_paid|floatformat:0 }}</td>
-                  <td style="color:#dc2626;">₦{{ total_outstanding|floatformat:0 }}</td>
+                  <td style="color:#1e293b;">L${{ total_due|floatformat:0 }}</td>
+                  <td style="color:#065f46;">L${{ total_paid|floatformat:0 }}</td>
+                  <td style="color:#dc2626;">L${{ total_outstanding|floatformat:0 }}</td>
                   <td colspan="2" style="color:#64748b;font-weight:400;font-size:.75rem;">
                     {{ collection_rate }}% collected
                   </td>
