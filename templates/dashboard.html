@@ -1,0 +1,868 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>School Oversight Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet"/>
+  <link rel="icon" type="image/x-icon" href="{% static 'images/favico.png' %}">
+  <style>
+    body { background:#f4f6f9; font-family:'Segoe UI',sans-serif; margin:0; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      min-height:100vh; background:#1a2235; width:240px;
+      position:fixed; top:0; left:0; z-index:100; padding-top:1rem;
+    }
+    .sidebar .brand {
+      color:#fff; padding:1rem 1.25rem 1.5rem;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      display:flex; align-items:center; gap:10px;
+    }
+    .sidebar .brand .logo-circle {
+      width:34px; height:34px; background:#3b7ddd; border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1rem; color:#fff; flex-shrink:0;
+    }
+    .sidebar .nav-label {
+      font-size:.68rem; color:rgba(255,255,255,.35); text-transform:uppercase;
+      letter-spacing:.08em; padding:1.25rem 1.25rem .4rem;
+    }
+    .sidebar .nav-link {
+      color:rgba(255,255,255,.65); padding:.55rem 1.25rem;
+      font-size:.875rem; display:flex; align-items:center; gap:10px;
+      transition:background .15s,color .15s; text-decoration:none;
+    }
+    .sidebar .nav-link:hover,
+    .sidebar .nav-link.active { background:rgba(255,255,255,.07); color:#fff; }
+    .sidebar .nav-link i { font-size:1rem; width:18px; }
+
+    /* ── Layout ── */
+    .main-content { margin-left:240px; padding:0; }
+    .top-navbar {
+      background:#fff; border-bottom:1px solid #e9ecef;
+      padding:.75rem 1.75rem; position:sticky; top:0; z-index:99;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .top-navbar .page-title { font-size:1rem; font-weight:600; color:#1a2235; margin:0; }
+    .top-navbar .date-badge {
+      font-size:.8rem; color:#6c757d; background:#f4f6f9;
+      padding:4px 12px; border-radius:20px; border:1px solid #e9ecef;
+    }
+    .dashboard-body { padding:1.5rem 1.75rem; }
+    .section-heading {
+      font-size:.85rem; font-weight:600; text-transform:uppercase;
+      letter-spacing:.06em; color:#6c757d; margin-bottom:.75rem; margin-top:.5rem;
+    }
+
+    /* ── Metric cards ── */
+    .metric-card {
+      background:#fff; border-radius:12px; padding:1.25rem 1.4rem;
+      border:1px solid #e9ecef; height:100%; position:relative; overflow:hidden;
+    }
+    .metric-card .icon-wrap {
+      width:44px; height:44px; border-radius:10px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.2rem; margin-bottom:1rem;
+    }
+    .metric-card .metric-value { font-size:1.75rem; font-weight:700; color:#1a2235; line-height:1; margin-bottom:.25rem; }
+    .metric-card .metric-label { font-size:.78rem; color:#6c757d; text-transform:uppercase; letter-spacing:.05em; font-weight:500; }
+    .metric-card .metric-sub   { font-size:.8rem; color:#6c757d; margin-top:.5rem; }
+    .metric-card::before {
+      content:''; position:absolute; left:0; top:0; bottom:0;
+      width:4px; border-radius:12px 0 0 12px;
+    }
+    .metric-card.blue::before   { background:#3b7ddd; }
+    .metric-card.green::before  { background:#28a745; }
+    .metric-card.orange::before { background:#fd7e14; }
+    .metric-card.red::before    { background:#dc3545; }
+
+    /* ── Panel cards ── */
+    .panel-card { background:#fff; border-radius:12px; border:1px solid #e9ecef; overflow:hidden; }
+    .panel-card .panel-header {
+      padding:.9rem 1.25rem; border-bottom:1px solid #f0f2f5;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .panel-card .panel-header h6 { margin:0; font-size:.9rem; font-weight:600; color:#1a2235; }
+    .panel-card .panel-body { padding:1.25rem; }
+
+    /* ── Finance pills ── */
+    .finance-pill {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.6rem 0; border-bottom:1px solid #f0f2f5; font-size:.875rem;
+    }
+    .finance-pill:last-child { border-bottom:none; }
+    .pill-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:8px; flex-shrink:0; }
+
+    /* ── Finance sortable table ── */
+    .fin-table { width:100%; border-collapse:collapse; }
+    .fin-table thead tr { background:#f8f9fa; }
+    .fin-table th {
+      padding:.65rem 1rem; font-size:.72rem; font-weight:600;
+      text-transform:uppercase; letter-spacing:.05em; color:#64748b;
+      border-bottom:2px solid #e9ecef; white-space:nowrap;
+    }
+    .fin-table th a {
+      text-decoration:none; color:inherit;
+      display:flex; align-items:center; gap:5px;
+    }
+    .fin-table th a:hover { color:#3b7ddd; }
+    .fin-table td { padding:.7rem 1rem; vertical-align:middle; border-bottom:1px solid #f1f5f9; color:#334155; font-size:.845rem; }
+    .fin-table tbody tr:hover td { background:#f8faff; }
+    .fin-table tfoot td { padding:.6rem 1rem; background:#f8f9fa; border-top:2px solid #e9ecef; font-weight:700; font-size:.82rem; }
+    /* Blue tint on the active sort column */
+    .col-sort { background:#f0f7ff !important; }
+
+    /* ── Sort legend bar ── */
+    .sort-bar {
+      padding:.45rem 1rem; background:#f8f9ff; border-bottom:1px solid #e8eeff;
+      font-size:.76rem; color:#3b7ddd; display:flex; align-items:center; gap:6px;
+    }
+
+    /* ── Discipline table ── */
+    .discipline-table th {
+      font-size:.73rem; font-weight:600; text-transform:uppercase;
+      letter-spacing:.05em; color:#6c757d; background:#f8f9fa;
+      border-bottom:1px solid #e9ecef; padding:.65rem 1rem;
+    }
+    .discipline-table td {
+      font-size:.845rem; padding:.7rem 1rem; vertical-align:middle;
+      border-bottom:1px solid #f0f2f5; color:#344054;
+    }
+    .discipline-table tr:last-child td { border-bottom:none; }
+    .discipline-table tr:hover td { background:#fafbfc; }
+
+    /* ── Event list ── */
+    .event-item { display:flex; gap:12px; padding:.65rem 0; border-bottom:1px solid #f0f2f5; align-items:flex-start; }
+    .event-item:last-child { border-bottom:none; }
+    .event-dot { width:8px; height:8px; border-radius:50%; margin-top:6px; flex-shrink:0; }
+    .event-name { font-size:.855rem; font-weight:500; color:#1a2235; margin-bottom:2px; }
+    .event-meta { font-size:.775rem; color:#6c757d; }
+
+    /* ── Grade bars ── */
+    .grade-row { display:flex; align-items:center; gap:10px; margin-bottom:.6rem; font-size:.83rem; }
+    .grade-label { width:80px; color:#344054; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .grade-bar-wrap { flex:1; background:#f0f2f5; border-radius:4px; height:8px; overflow:hidden; }
+    .grade-bar      { height:100%; border-radius:4px; background:#3b7ddd; }
+    .grade-count    { width:28px; text-align:right; color:#6c757d; font-size:.8rem; }
+
+    /* ── Alert boxes ── */
+    .alert-urgent {
+      background:#fff5f5; border:1px solid #ffd5d5; border-radius:10px;
+      padding:.85rem 1.1rem; display:flex; align-items:flex-start; gap:10px; margin-bottom:.65rem;
+    }
+    .alert-urgent:last-child { margin-bottom:0; }
+    .alert-urgent .alert-icon  { color:#dc3545; font-size:1.1rem; flex-shrink:0; margin-top:1px; }
+    .alert-urgent .alert-title { font-size:.865rem; font-weight:600; color:#991b1b; margin-bottom:2px; }
+    .alert-urgent .alert-body  { font-size:.8rem; color:#b91c1c; }
+
+    /* ── Event status badges ── */
+    .status-upcoming    { background:#dbeafe; color:#1d4ed8; }
+    .status-in_progress { background:#dcfce7; color:#166534; }
+    .status-completed   { background:#f3f4f6; color:#374151; }
+
+    /* ── Avatar ── */
+    .avatar {
+      width:30px; height:30px; border-radius:50%; background:#eff4ff;
+      color:#3b7ddd; display:flex; align-items:center; justify-content:center;
+      font-size:.72rem; font-weight:600; flex-shrink:0;
+    }
+
+    /* ── Update button ── */
+    .update-link {
+      font-size:.75rem; color:#3b7ddd; text-decoration:none;
+      padding:4px 10px; border:1px solid #dbeafe; border-radius:5px; white-space:nowrap;
+    }
+    .update-link:hover { background:#eff6ff; }
+
+    @media (max-width:768px) {
+      .sidebar      { display:none; }
+      .main-content { margin-left:0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ============================================================
+     SIDEBAR
+============================================================ -->
+<aside class="sidebar">
+  <div class="brand">
+    <div class="logo-circle"><i class="bi bi-mortarboard-fill"></i></div>
+    <div>
+      <div style="font-size:.85rem;font-weight:600;">EduOversight</div>
+      <div style="font-size:.7rem;color:rgba(255,255,255,.45);">Proprietor Portal</div>
+    </div>
+  </div>
+  <div class="nav-label">Overview</div>
+  <a href="/" class="nav-link active"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+  <div class="nav-label">Modules</div>
+  <a href="/admin/school/student/"        class="nav-link"><i class="bi bi-people-fill"></i> Students</a>
+  <a href="/admin/school/finance/"        class="nav-link"><i class="bi bi-cash-stack"></i> Finance</a>
+  <a href="/admin/school/academiccalendar/" class="nav-link"><i class="bi bi-calendar3"></i> Academic Calendar</a>
+  <a href="/admin/school/discipline/"     class="nav-link"><i class="bi bi-exclamation-triangle-fill"></i> Discipline</a>
+  <div class="nav-label">Admin</div>
+  <a href="/admin/" class="nav-link"><i class="bi bi-shield-lock-fill"></i> Admin Panel</a>
+</aside>
+
+
+<!-- ============================================================
+     MAIN CONTENT
+============================================================ -->
+<div class="main-content">
+
+  <!-- Top Navbar -->
+  <div class="top-navbar">
+    <p class="page-title">
+      <i class="bi bi-grid-1x2-fill me-2" style="color:#3b7ddd;"></i>
+      Proprietor Dashboard
+    </p>
+    <div class="d-flex align-items-center gap-3">
+      {% if urgent_alert_count > 0 %}
+      <span class="badge bg-danger" style="font-size:.75rem;padding:6px 10px;">
+        <i class="bi bi-bell-fill me-1"></i>
+        {{ urgent_alert_count }} Urgent Alert{{ urgent_alert_count|pluralize }}
+      </span>
+      {% endif %}
+      <span class="date-badge"><i class="bi bi-calendar3 me-1"></i>{{ today }}</span>
+    </div>
+  </div>
+
+  <div class="dashboard-body">
+
+    <!-- =========================================================
+         1. URGENT EXPULSION ALERTS
+    ========================================================== -->
+    {% if urgent_alerts %}
+    <div class="mb-3">
+      <div class="panel-card">
+        <div class="panel-header" style="background:#fff5f5;border-bottom-color:#ffd5d5;">
+          <h6 style="color:#991b1b;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            Urgent Expulsion Alerts — Last 7 Days
+          </h6>
+          <span class="badge" style="background:#dc3545;color:#fff;font-size:.75rem;padding:5px 10px;">
+            {{ urgent_alert_count }} Alert{{ urgent_alert_count|pluralize }}
+          </span>
+        </div>
+        <div class="panel-body">
+          {% for alert in urgent_alerts %}
+          <div class="alert-urgent">
+            <i class="bi bi-person-x-fill alert-icon"></i>
+            <div>
+              <div class="alert-title">
+                {{ alert.student.student_name }} — {{ alert.get_action_taken_display }}
+              </div>
+              <div class="alert-body">
+                <strong>Grade:</strong> {{ alert.student.grade_level }}
+                &nbsp;|&nbsp;
+                <strong>Date:</strong> {{ alert.date }}
+                &nbsp;|&nbsp;
+                <strong>Issued by:</strong> {{ alert.issued_by|default:"Not specified" }}
+              </div>
+              <div class="alert-body mt-1">
+                <strong>Reason:</strong> {{ alert.reason }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+
+    <!-- =========================================================
+         2. FOUR METRIC CARDS
+    ========================================================== -->
+    <div class="section-heading">Key Metrics</div>
+    <div class="row g-3 mb-4">
+
+      <div class="col-6 col-xl-3">
+        <div class="metric-card blue">
+          <div class="icon-wrap" style="background:#eff4ff;color:#3b7ddd;"><i class="bi bi-people-fill"></i></div>
+          <div class="metric-value">{{ total_active_students }}</div>
+          <div class="metric-label">Active Students</div>
+          <div class="metric-sub">Currently enrolled</div>
+        </div>
+      </div>
+
+      <div class="col-6 col-xl-3">
+        <div class="metric-card green">
+          <div class="icon-wrap" style="background:#f0fdf4;color:#28a745;"><i class="bi bi-cash-coin"></i></div>
+          <div class="metric-value">{{ collection_rate }}%</div>
+          <div class="metric-label">Collection Rate</div>
+          <div class="metric-sub">₦{{ total_paid|floatformat:0 }} of ₦{{ total_due|floatformat:0 }}</div>
+        </div>
+      </div>
+
+      <div class="col-6 col-xl-3">
+        <div class="metric-card orange">
+          <div class="icon-wrap" style="background:#fff7ed;color:#fd7e14;"><i class="bi bi-calendar-event-fill"></i></div>
+          {% if todays_event %}
+            <div class="metric-value" style="font-size:1rem;line-height:1.3;margin-bottom:.35rem;">{{ todays_event.event_name }}</div>
+            <div class="metric-label">Today's Event</div>
+            <div class="metric-sub">{{ todays_event.get_event_type_display }}</div>
+          {% else %}
+            <div class="metric-value" style="font-size:1.1rem;">No Event</div>
+            <div class="metric-label">Today's Event</div>
+            <div class="metric-sub">Nothing scheduled today</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-6 col-xl-3">
+        <div class="metric-card red">
+          <div class="icon-wrap" style="background:#fff5f5;color:#dc3545;"><i class="bi bi-shield-exclamation"></i></div>
+          <div class="metric-value">{{ urgent_alert_count }}</div>
+          <div class="metric-label">Expulsion Alerts</div>
+          <div class="metric-sub">Past 7 days</div>
+        </div>
+      </div>
+
+    </div><!-- /metric cards -->
+
+
+    <!-- =========================================================
+         3. FEE SUMMARY  +  SORTABLE FINANCE TABLE
+    ========================================================== -->
+    <div class="section-heading">Financial Records</div>
+    <div class="row g-3 mb-4">
+
+      <!-- Left: Fee summary -->
+      <div class="col-12 col-lg-3">
+        <div class="panel-card h-100">
+          <div class="panel-header">
+            <h6><i class="bi bi-cash-stack me-2" style="color:#28a745;"></i>Fee Collection</h6>
+          </div>
+          <div class="panel-body">
+
+            <div class="d-flex justify-content-between mb-1">
+              <small class="text-muted fw-semibold">Progress</small>
+              <small class="fw-bold">{{ collection_rate }}%</small>
+            </div>
+            <div class="progress mb-3" style="height:10px;border-radius:6px;">
+              <div class="progress-bar bg-{{ collection_bar_color }}"
+                   role="progressbar"
+                   style="width:{{ collection_rate }}%;transition:width .8s ease;"
+                   aria-valuenow="{{ collection_rate }}" aria-valuemin="0" aria-valuemax="100">
+              </div>
+            </div>
+
+            <div class="finance-pill">
+              <div><span class="pill-dot" style="background:#28a745;"></span>Fully Paid</div>
+              <span class="badge" style="background:#f0fdf4;color:#166534;font-size:.78rem;padding:4px 10px;">
+                {{ fully_paid_count }} student{{ fully_paid_count|pluralize }}
+              </span>
+            </div>
+            <div class="finance-pill">
+              <div><span class="pill-dot" style="background:#fd7e14;"></span>Partial</div>
+              <span class="badge" style="background:#fff7ed;color:#9a3412;font-size:.78rem;padding:4px 10px;">
+                {{ partial_count }} student{{ partial_count|pluralize }}
+              </span>
+            </div>
+            <div class="finance-pill">
+              <div><span class="pill-dot" style="background:#dc3545;"></span>Unpaid</div>
+              <span class="badge" style="background:#fff5f5;color:#991b1b;font-size:.78rem;padding:4px 10px;">
+                {{ unpaid_count }} student{{ unpaid_count|pluralize }}
+              </span>
+            </div>
+
+            <!-- Gender breakdown -->
+            <div class="mt-3 pt-3" style="border-top:1px solid #f0f2f5;">
+              <div class="section-heading mb-2" style="margin-top:0;">By Gender</div>
+              <div class="d-flex gap-2 flex-wrap">
+                <span class="badge" style="background:#eff4ff;color:#1d4ed8;font-size:.78rem;padding:5px 10px;">
+                  &#9794; Male: {{ male_count }}
+                </span>
+                <span class="badge" style="background:#fdf2f8;color:#9d174d;font-size:.78rem;padding:5px 10px;">
+                  &#9792; Female: {{ female_count }}
+                </span>
+                {% if other_count > 0 %}
+                <span class="badge" style="background:#f3f4f6;color:#374151;font-size:.78rem;padding:5px 10px;">
+                  Other: {{ other_count }}
+                </span>
+                {% endif %}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div><!-- /left -->
+
+
+      <!-- Right: Sortable finance table -->
+      <div class="col-12 col-lg-9">
+        <div class="panel-card">
+
+          <!-- Panel header -->
+          <div class="panel-header">
+            <h6>
+              <i class="bi bi-table me-2" style="color:#3b7ddd;"></i>
+              Finance Records
+              <span class="badge ms-1" style="background:#eff4ff;color:#3b7ddd;font-size:.72rem;padding:3px 8px;">
+                {{ finance_count }}
+              </span>
+            </h6>
+            <a href="/admin/school/finance/"
+               style="font-size:.75rem;padding:4px 12px;border:1px solid #e9ecef;
+                      border-radius:6px;color:#6c757d;text-decoration:none;">
+              Edit in Admin
+            </a>
+          </div>
+
+          <!-- Search bar
+               Hidden inputs carry the current sort so search doesn't reset it -->
+          <div style="padding:.75rem 1rem;border-bottom:1px solid #f0f2f5;background:#fafbfc;">
+            <form method="GET" action="">
+              <input type="hidden" name="sort" value="{{ sort_by }}">
+              <input type="hidden" name="dir"  value="{{ sort_dir }}">
+              <div class="input-group">
+                <span class="input-group-text"
+                      style="background:#fff;border:1px solid #e2e8f0;border-right:none;
+                             color:#94a3b8;font-size:.85rem;">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input type="text" name="finance_search" value="{{ finance_search }}"
+                       placeholder="Search by name, grade or status…"
+                       class="form-control"
+                       style="border:1px solid #e2e8f0;border-left:none;border-right:none;
+                              font-size:.85rem;box-shadow:none;"
+                       autocomplete="off"/>
+                {% if finance_search %}
+                <a href="?sort={{ sort_by }}&dir={{ sort_dir }}"
+                   class="btn"
+                   style="background:#fff;color:#dc3545;border:1px solid #e2e8f0;
+                          border-right:none;font-size:.8rem;padding:0 10px;"
+                   title="Clear search">
+                  <i class="bi bi-x-lg"></i>
+                </a>
+                {% endif %}
+                <button type="submit" class="btn"
+                        style="background:#3b7ddd;color:#fff;font-size:.82rem;
+                               border-radius:0 6px 6px 0;padding:0 16px;border:none;">
+                  Search
+                </button>
+              </div>
+              {% if finance_search %}
+              <div class="mt-2" style="font-size:.78rem;color:#64748b;">
+                <i class="bi bi-funnel-fill me-1"></i>
+                Showing <strong>{{ finance_count }}</strong>
+                result{{ finance_count|pluralize }} for
+                "<strong>{{ finance_search }}</strong>"
+              </div>
+              {% endif %}
+            </form>
+          </div>
+
+          <!-- Active sort indicator (hidden when using default name/asc) -->
+          {% if sort_by != 'name' or sort_dir != 'asc' %}
+          <div class="sort-bar">
+            <i class="bi bi-sort-down-alt"></i>
+            Sorted by
+            <strong>
+              {% if sort_by == 'name'    %}Student Name
+              {% elif sort_by == 'gender'%}Gender
+              {% elif sort_by == 'grade' %}Grade
+              {% elif sort_by == 'due'   %}Fees Due
+              {% elif sort_by == 'paid'  %}Amount Paid
+              {% elif sort_by == 'balance'%}Balance
+              {% elif sort_by == 'status'%}Status
+              {% endif %}
+            </strong>
+            ({{ sort_dir }}ending)
+            &nbsp;·&nbsp;
+            <a href="?sort=name&dir=asc{% if finance_search %}&finance_search={{ finance_search }}{% endif %}"
+               style="color:#dc3545;text-decoration:none;">
+              <i class="bi bi-x-circle me-1"></i>Reset
+            </a>
+          </div>
+          {% endif %}
+
+          <!-- The table itself -->
+          {% if finance_records %}
+          <div style="overflow-x:auto;">
+            <table class="fin-table">
+
+              <thead>
+                <tr>
+
+                  <!-- Student Name (sortable) -->
+                  <th>
+                    <a href="?sort=name&dir={% if sort_by == 'name' %}{{ next_dir }}{% else %}asc{% endif %}{% if finance_search %}&finance_search={{ finance_search }}{% endif %}">
+                      Student
+                      {% if sort_by == 'name' %}
+                        <i class="bi bi-arrow-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}-circle-fill" style="color:#3b7ddd;font-size:.8rem;"></i>
+                      {% else %}
+                        <i class="bi bi-arrow-down-up" style="color:#cbd5e1;font-size:.75rem;"></i>
+                      {% endif %}
+                    </a>
+                  </th>
+
+                  <!-- Gender (sortable) -->
+                  <th>
+                    <a href="?sort=gender&dir={% if sort_by == 'gender' %}{{ next_dir }}{% else %}asc{% endif %}{% if finance_search %}&finance_search={{ finance_search }}{% endif %}">
+                      Gender
+                      {% if sort_by == 'gender' %}
+                        <i class="bi bi-arrow-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}-circle-fill" style="color:#3b7ddd;font-size:.8rem;"></i>
+                      {% else %}
+                        <i class="bi bi-arrow-down-up" style="color:#cbd5e1;font-size:.75rem;"></i>
+                      {% endif %}
+                    </a>
+                  </th>
+
+                  <!-- Grade (sortable) -->
+                  <th>
+                    <a href="?sort=grade&dir={% if sort_by == 'grade' %}{{ next_dir }}{% else %}asc{% endif %}{% if finance_search %}&finance_search={{ finance_search }}{% endif %}">
+                      Grade
+                      {% if sort_by == 'grade' %}
+                        <i class="bi bi-arrow-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}-circle-fill" style="color:#3b7ddd;font-size:.8rem;"></i>
+                      {% else %}
+                        <i class="bi bi-arrow-down-up" style="color:#cbd5e1;font-size:.75rem;"></i>
+                      {% endif %}
+                    </a>
+                  </th>
+
+                  <!-- Fees Due (sortable) -->
+                  <th>
+                    <a href="?sort=due&dir={% if sort_by == 'due' %}{{ next_dir }}{% else %}desc{% endif %}{% if finance_search %}&finance_search={{ finance_search }}{% endif %}">
+                      Fees Due
+                      {% if sort_by == 'due' %}
+                        <i class="bi bi-arrow-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}-circle-fill" style="color:#3b7ddd;font-size:.8rem;"></i>
+                      {% else %}
+                        <i class="bi bi-arrow-down-up" style="color:#cbd5e1;font-size:.75rem;"></i>
+                      {% endif %}
+                    </a>
+                  </th>
+
+                  <!-- Paid (sortable) -->
+                  <th>
+                    <a href="?sort=paid&dir={% if sort_by == 'paid' %}{{ next_dir }}{% else %}desc{% endif %}{% if finance_search %}&finance_search={{ finance_search }}{% endif %}">
+                      Paid
+                      {% if sort_by == 'paid' %}
+                        <i class="bi bi-arrow-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}-circle-fill" style="color:#3b7ddd;font-size:.8rem;"></i>
+                      {% else %}
+                        <i class="bi bi-arrow-down-up" style="color:#cbd5e1;font-size:.75rem;"></i>
+                      {% endif %}
+                    </a>
+                  </th>
+
+                  <!-- Balance (sortable — uses computed_balance annotation) -->
+                  <th>
+                    <a href="?sort=balance&dir={% if sort_by == 'balance' %}{{ next_dir }}{% else %}desc{% endif %}{% if finance_search %}&finance_search={{ finance_search }}{% endif %}">
+                      Balance
+                      {% if sort_by == 'balance' %}
+                        <i class="bi bi-arrow-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}-circle-fill" style="color:#3b7ddd;font-size:.8rem;"></i>
+                      {% else %}
+                        <i class="bi bi-arrow-down-up" style="color:#cbd5e1;font-size:.75rem;"></i>
+                      {% endif %}
+                    </a>
+                  </th>
+
+                  <!-- Status (sortable) -->
+                  <th>
+                    <a href="?sort=status&dir={% if sort_by == 'status' %}{{ next_dir }}{% else %}asc{% endif %}{% if finance_search %}&finance_search={{ finance_search }}{% endif %}">
+                      Status
+                      {% if sort_by == 'status' %}
+                        <i class="bi bi-arrow-{% if sort_dir == 'asc' %}up{% else %}down{% endif %}-circle-fill" style="color:#3b7ddd;font-size:.8rem;"></i>
+                      {% else %}
+                        <i class="bi bi-arrow-down-up" style="color:#cbd5e1;font-size:.75rem;"></i>
+                      {% endif %}
+                    </a>
+                  </th>
+
+                  <!-- Action (not sortable) -->
+                  <th>Action</th>
+
+                </tr>
+              </thead>
+
+              <tbody>
+                {% for record in finance_records %}
+                <tr>
+
+                  <!-- Student name + avatar -->
+                  <td>
+                    <div style="display:flex;align-items:center;gap:9px;">
+                      <div class="avatar">{{ record.student.student_name|first|upper }}</div>
+                      <span style="font-weight:500;color:#1e293b;white-space:nowrap;">
+                        {{ record.student.student_name }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- Gender — tinted when this column is the active sort -->
+                  <td {% if sort_by == 'gender' %}class="col-sort"{% endif %}>
+                    {% if record.student.gender == 'male' %}
+                      <span style="color:#1d4ed8;font-size:.82rem;font-weight:500;">&#9794; Male</span>
+                    {% elif record.student.gender == 'female' %}
+                      <span style="color:#9d174d;font-size:.82rem;font-weight:500;">&#9792; Female</span>
+                    {% else %}
+                      <span style="color:#6c757d;font-size:.82rem;">Other</span>
+                    {% endif %}
+                  </td>
+
+                  <!-- Grade -->
+                  <td {% if sort_by == 'grade' %}class="col-sort"{% endif %}>
+                    {{ record.student.grade_level.name }}
+                  </td>
+
+                  <!-- Fees Due -->
+                  <td {% if sort_by == 'due' %}class="col-sort"{% endif %}>
+                    ₦{{ record.total_fees_due|floatformat:0 }}
+                  </td>
+
+                  <!-- Amount Paid -->
+                  <td {% if sort_by == 'paid' %}class="col-sort"{% endif %}>
+                    <span style="font-weight:500;
+                      color:{% if record.payment_status == 'fully_paid' %}#065f46
+                            {% elif record.payment_status == 'partial'   %}#92400e
+                            {% else %}#991b1b{% endif %};">
+                      ₦{{ record.amount_paid|floatformat:0 }}
+                    </span>
+                  </td>
+
+                  <!-- Balance — from annotated computed_balance in view -->
+                  <td {% if sort_by == 'balance' %}class="col-sort"{% endif %}>
+                    <span style="font-weight:600;
+                      color:{% if record.payment_status == 'fully_paid' %}#065f46
+                            {% else %}#dc2626{% endif %};">
+                      ₦{{ record.computed_balance|floatformat:0 }}
+                    </span>
+                  </td>
+
+                  <!-- Payment status badge -->
+                  <td {% if sort_by == 'status' %}class="col-sort"{% endif %}>
+                    {% if record.payment_status == 'fully_paid' %}
+                      <span class="badge" style="background:#d1fae5;color:#065f46;font-size:.72rem;padding:4px 9px;border-radius:20px;">
+                        &#10003; Fully Paid
+                      </span>
+                    {% elif record.payment_status == 'partial' %}
+                      <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.72rem;padding:4px 9px;border-radius:20px;">
+                        ~ Partial
+                      </span>
+                    {% else %}
+                      <span class="badge" style="background:#fee2e2;color:#991b1b;font-size:.72rem;padding:4px 9px;border-radius:20px;">
+                        &#10005; Unpaid
+                      </span>
+                    {% endif %}
+                  </td>
+
+                  <!-- Update link to admin edit page -->
+                  <td>
+                    <a href="/admin/school/finance/{{ record.pk }}/change/" class="update-link">
+                      &#9998; Update
+                    </a>
+                  </td>
+
+                </tr>
+                {% endfor %}
+              </tbody>
+
+              <!-- Totals footer -->
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="font-weight:600;color:#64748b;font-size:.78rem;">
+                    {{ finance_count }} record{{ finance_count|pluralize }}
+                    {% if finance_search %}(filtered){% endif %}
+                  </td>
+                  <td style="color:#1e293b;">₦{{ total_due|floatformat:0 }}</td>
+                  <td style="color:#065f46;">₦{{ total_paid|floatformat:0 }}</td>
+                  <td style="color:#dc2626;">₦{{ total_outstanding|floatformat:0 }}</td>
+                  <td colspan="2" style="color:#64748b;font-weight:400;font-size:.75rem;">
+                    {{ collection_rate }}% collected
+                  </td>
+                </tr>
+              </tfoot>
+
+            </table>
+          </div>
+
+          {% else %}
+          <!-- Empty state -->
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-search" style="font-size:1.75rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0" style="font-size:.85rem;">
+              {% if finance_search %}
+                No records match "<strong>{{ finance_search }}</strong>"
+              {% else %}
+                No finance records yet
+              {% endif %}
+            </p>
+          </div>
+          {% endif %}
+
+        </div>
+      </div><!-- /right col -->
+
+    </div><!-- /financial records row -->
+
+
+    <!-- =========================================================
+         4. UPCOMING EVENTS  +  DISCIPLINE TABLE
+    ========================================================== -->
+    <div class="section-heading">Activity &amp; Discipline</div>
+    <div class="row g-3 mb-4">
+
+      <!-- Upcoming Events -->
+      <div class="col-12 col-lg-4">
+        <div class="panel-card h-100">
+          <div class="panel-header">
+            <h6><i class="bi bi-calendar3 me-2" style="color:#3b7ddd;"></i>Upcoming Events</h6>
+            <span class="badge" style="background:#eff4ff;color:#3b7ddd;font-size:.75rem;padding:4px 10px;">
+              Next {{ upcoming_events|length }}
+            </span>
+          </div>
+          <div class="panel-body">
+            {% if upcoming_events %}
+              {% for event in upcoming_events %}
+              <div class="event-item">
+                {% if event.event_type == 'test'     %}<span class="event-dot" style="background:#dc3545;"></span>
+                {% elif event.event_type == 'trip'   %}<span class="event-dot" style="background:#3b7ddd;"></span>
+                {% elif event.event_type == 'revision'%}<span class="event-dot" style="background:#28a745;"></span>
+                {% else %}                              <span class="event-dot" style="background:#fd7e14;"></span>
+                {% endif %}
+                <div style="flex:1;">
+                  <div class="event-name">{{ event.event_name }}</div>
+                  <div class="event-meta">
+                    {{ event.start_date }}
+                    &nbsp;·&nbsp;
+                    {{ event.get_event_type_display }}
+                    &nbsp;·&nbsp;
+                    <span class="badge rounded-pill status-{{ event.status }}">
+                      {{ event.get_status_display }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-calendar-x" style="font-size:1.75rem;opacity:.35;"></i>
+                <p class="mt-2 mb-0" style="font-size:.85rem;">No upcoming events scheduled</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Discipline Records -->
+      <div class="col-12 col-lg-8">
+        <div class="panel-card">
+          <div class="panel-header">
+            <h6>
+              <i class="bi bi-exclamation-triangle me-2" style="color:#fd7e14;"></i>
+              Recent Discipline Records
+            </h6>
+            <a href="/admin/school/discipline/"
+               style="font-size:.75rem;padding:4px 12px;border:1px solid #e9ecef;
+                      border-radius:6px;color:#6c757d;text-decoration:none;">
+              View All
+            </a>
+          </div>
+          {% if recent_discipline %}
+          <table class="table mb-0 discipline-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Grade</th>
+                <th>Action</th>
+                <th>Date</th>
+                <th>Issued By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for record in recent_discipline %}
+              <tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:9px;">
+                    <div class="avatar">{{ record.student.student_name|first|upper }}</div>
+                    <span>{{ record.student.student_name }}</span>
+                  </div>
+                </td>
+                <td>{{ record.student.grade_level }}</td>
+                <td>
+                  {% if record.action_taken == 'expulsion' %}
+                    <span class="badge" style="background:#fff5f5;color:#991b1b;font-size:.75rem;padding:4px 9px;">
+                      <i class="bi bi-x-circle-fill me-1"></i>{{ record.get_action_taken_display }}
+                    </span>
+                  {% elif record.action_taken == 'suspension' %}
+                    <span class="badge" style="background:#fff7ed;color:#9a3412;font-size:.75rem;padding:4px 9px;">
+                      <i class="bi bi-pause-circle-fill me-1"></i>{{ record.get_action_taken_display }}
+                    </span>
+                  {% elif record.action_taken == 'detention' %}
+                    <span class="badge" style="background:#fefce8;color:#854d0e;font-size:.75rem;padding:4px 9px;">
+                      <i class="bi bi-clock-fill me-1"></i>{{ record.get_action_taken_display }}
+                    </span>
+                  {% else %}
+                    <span class="badge" style="background:#f3f4f6;color:#374151;font-size:.75rem;padding:4px 9px;">
+                      <i class="bi bi-info-circle-fill me-1"></i>{{ record.get_action_taken_display }}
+                    </span>
+                  {% endif %}
+                </td>
+                <td>{{ record.date }}</td>
+                <td>{{ record.issued_by|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-shield-check" style="font-size:2rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0" style="font-size:.85rem;">No discipline records found</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div><!-- /activity & discipline row -->
+
+
+    <!-- =========================================================
+         5. ENROLLMENT BY GRADE
+    ========================================================== -->
+    <div class="section-heading">Enrollment by Grade</div>
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-lg-5">
+        <div class="panel-card">
+          <div class="panel-header">
+            <h6><i class="bi bi-bar-chart-fill me-2" style="color:#3b7ddd;"></i>Students per Grade</h6>
+          </div>
+          <div class="panel-body">
+            {% if grade_breakdown %}
+              {% for grade in grade_breakdown %}
+              <div class="grade-row">
+                <div class="grade-label" title="{{ grade.grade_level__name }}">
+                  {{ grade.grade_level__name }}
+                </div>
+                <div class="grade-bar-wrap">
+                  <div class="grade-bar" style="width:min({{ grade.student_count }}0%, 100%);"></div>
+                </div>
+                <div class="grade-count">{{ grade.student_count }}</div>
+              </div>
+              {% endfor %}
+            {% else %}
+              <div class="text-center py-4 text-muted">
+                <i class="bi bi-people" style="font-size:1.75rem;opacity:.35;"></i>
+                <p class="mt-2 mb-0" style="font-size:.85rem;">No enrollment data yet</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div><!-- /enrollment row -->
+
+
+    <!-- Footer -->
+    <div class="text-center pt-2 pb-4" style="font-size:.78rem;color:#adb5bd;">
+      EduOversight &mdash; Proprietor's Remote School Oversight System &mdash; {{ today }}
+    </div>
+
+  </div><!-- /dashboard-body -->
+</div><!-- /main-content -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
