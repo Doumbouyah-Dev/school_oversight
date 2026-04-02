@@ -57,13 +57,19 @@ MIDDLEWARE = [
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # ADD THIS LINE
 
-# This uses the Postgres DB you set up on Render
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=600
-    )
-}
+# 1. Get the URL from the environment
+db_from_env = dj_database_url.config(conn_max_age=600)
+
+if db_from_env:
+    DATABASES = {'default': db_from_env}
+else:
+    # 2. Fallback for local development if DATABASE_URL isn't set
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 ROOT_URLCONF = 'oversight_project.urls'
