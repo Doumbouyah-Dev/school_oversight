@@ -24,7 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', 'local-development-only-key')
 
 # SECURITY 
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = True
+
+# DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['school-oversight.onrender.com', 'localhost', '127.0.0.1']
 if os.environ.get('RENDER_EXTERNAL_HOSTNAME'):
@@ -39,7 +41,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'simple_history',
     'school',
+    
 ]
 
 MIDDLEWARE = [
@@ -51,11 +55,17 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
+STATICFILES_DIRS = []
+local_static = os.path.join(BASE_DIR, 'static')
+if os.path.exists(local_static):
+    STATICFILES_DIRS.append(local_static)
+
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # ADD THIS LINE
 
 # If we are on Render, use Postgres. If not, use SQLite locally.
@@ -82,7 +92,7 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
-                'django.template.context_processors.request',
+                'django.template.context_processors.request', 
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],

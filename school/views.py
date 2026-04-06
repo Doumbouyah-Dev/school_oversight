@@ -1,16 +1,29 @@
-# school/views.py
+from multiprocessing import context
 
-from django.views.generic import TemplateView
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import TemplateView, DetailView
 from django.utils import timezone
 from django.db.models import (
     Sum, Count, Q, F,
     ExpressionWrapper, DecimalField
 )
-from .models import Student, Finance, AcademicCalendar, Discipline
+from .models import Student, Finance, AcademicCalendar, Discipline, PaymentTransaction
+from .models import (
+    Student, Finance, PaymentTransaction,
+    AcademicCalendar, Discipline, AuditLog
+)
+
 import datetime
 
 
-class ProprietorDashboardView(TemplateView):
+#New LoginRequiredMixin MUST come first, before TemplateView | April 04, 2024 | 
+class ProprietorDashboardView(LoginRequiredMixin, TemplateView):
+    """
+    LoginRequiredMixin adds one behaviour:
+    If the user is NOT logged in → redirect to login_url.
+    If the user IS logged in     → proceed normally.
+    """
     login_url    = '/admin/login/'  # Where to send unauthenticated visitors
     redirect_field_name = 'next'    # After login, returns them to the dashboard
     template_name = 'dashboard.html'
@@ -65,6 +78,60 @@ class ProprietorDashboardView(TemplateView):
 
         # ── Finance search ─────────────────────────────────────
         finance_search = self.request.GET.get('finance_search', '').strip()
+        
+        # ── Recent payment transactions ────────────────────────────
+        recent_payments = PaymentTransaction.objects.select_related(
+            'finance__student',
+            'finance__student__grade_level',
+        ).order_by('-date', '-created_at')[:15]
+
+        # ── Today's collections ────────────────────────────────────
+        todays_collections = PaymentTransaction.objects.filter(
+            date=today
+        ).aggregate(
+            total=Sum('amount'),
+            count=Count('id'),
+        )
+        todays_total  = todays_collections['total'] or 0
+        todays_count  = todays_collections['count'] or 0
+
+        # ── This month's collections ───────────────────────────────
+        month_start = today.replace(day=1)
+        monthly_collections = PaymentTransaction.objects.filter(
+            date__gte=month_start
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        # ADD to context.update():
+        context.update({
+        # ... your existing keys ...
+        'recent_payments'      : recent_payments,
+        'todays_total'         : todays_total,
+        'todays_count'         : todays_count,
+        'monthly_collections'  : monthly_collections,
+             })
+            
+        # ── Recent payment transactions ────────────────────────────
+        recent_payments = PaymentTransaction.objects.select_related(
+            'finance__student',
+            'finance__student__grade_level',
+        ).order_by('-date', '-created_at')[:15]
+
+        # ── Today's collections ────────────────────────────────────
+        todays_collections = PaymentTransaction.objects.filter(
+            date=today
+        ).aggregate(
+            total=Sum('amount'),
+            count=Count('id'),
+        )
+        todays_total  = todays_collections['total'] or 0
+        todays_count  = todays_collections['count'] or 0
+
+        # ── This month's collections ───────────────────────────────
+        month_start = today.replace(day=1)
+        monthly_collections = PaymentTransaction.objects.filter(
+            date__gte=month_start
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
 
         # ── Sorting ────────────────────────────────────────────
         sort_by  = self.request.GET.get('sort', 'name')
@@ -157,5 +224,37 @@ class ProprietorDashboardView(TemplateView):
             'next_dir'              : next_dir,
             'recent_discipline'     : recent_discipline,
             'grade_breakdown'       : grade_breakdown,
+            'recent_payments'      : recent_payments,
+            'todays_total'         : todays_total,
+            'todays_count'         : todays_count,
+            'monthly_collections'  : monthly_collections,
         })
+        
+        # ── Audit log feed ─────────────────────────────────────────
+        recent_activity = AuditLog.objects.select_related(
+            'user'
+        ).order_by('-timestamp')[:20]
+
+        # Stats for the audit summary card
+        audit_today = AuditLog.objects.filter(
+            timestamp__date=today
+        ).count()
+
+        # Add to context.update():
+        context.update({
+            'recent_activity' : recent_activity,
+            'audit_today'     : audit_today,
+        })
+        
         return context
+
+class ReceiptView(LoginRequiredMixin, DetailView):
+    """
+    Renders a clean printable receipt for a single PaymentTransaction.
+    URL: /receipt/<receipt_number>/
+    """
+    model               = PaymentTransaction
+    template_name       = 'receipt.html'
+    slug_field          = 'receipt_number'
+    slug_url_kwarg      = 'receipt_number'
+    login_url           = '/admin/login/'

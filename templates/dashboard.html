@@ -227,6 +227,28 @@
       </span>
       {% endif %}
       <span class="date-badge"><i class="bi bi-calendar3 me-1"></i>{{ today }}</span>
+      
+#New Changes | Saturday, April 04, 2026
+<div class="d-flex align-items-center gap-2"
+     style="border-left:1px solid #e9ecef;padding-left:1rem;">
+  
+  {# Show who is logged in #}
+  <span style="font-size:.8rem;color:#6c757d;">
+    <i class="bi bi-person-circle me-1"></i>
+    {{ request.user.get_full_name|default:request.user.username }}
+  </span>
+
+  {# Logout button — uses Django's built-in logout view #}
+  <form method="POST" action="/admin/logout/" style="margin:0;">
+    {% csrf_token %}
+    <button type="submit"
+            style="font-size:.75rem;color:#dc3545;background:none;
+                   border:1px solid #fecaca;border-radius:6px;
+                   padding:4px 10px;cursor:pointer;">
+      <i class="bi bi-box-arrow-right me-1"></i>Logout
+    </button>
+  </form>
+</div>
     </div>
   </div>
 
@@ -412,6 +434,167 @@
               Edit in Admin
             </a>
           </div>
+
+
+          #NEW Financial Receipt |April 04, 2026 | 
+
+<!-- ── Recent Payment Transactions Panel ── -->
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="panel-card">
+      <div class="panel-header">
+        <h6>
+          <i class="bi bi-clock-history me-2" style="color:#28a745;"></i>
+          Recent Payment Transactions
+          <span class="badge ms-1"
+            style="background:#f0fdf4;color:#166534;font-size:.72rem;padding:3px 8px;">
+            Latest 15
+          </span>
+        </h6>
+        <!-- Today's and monthly totals in the header -->
+        <div class="d-flex gap-3 align-items-center">
+          <span style="font-size:.78rem;color:#6c757d;">
+            Today:
+            <strong style="color:#065f46;">
+              L${{ todays_total|floatformat:0 }}
+            </strong>
+            ({{ todays_count }} payment{{ todays_count|pluralize }})
+          </span>
+          <span style="font-size:.78rem;color:#6c757d;">
+            This month:
+            <strong style="color:#065f46;">
+              L${{ monthly_collections|floatformat:0 }}
+            </strong>
+          </span>
+          <a href="/admin/school/paymenttransaction/add/"
+             style="font-size:.75rem;padding:4px 12px;background:#28a745;
+                    color:#fff;border-radius:6px;text-decoration:none;">
+            <i class="bi bi-plus-lg me-1"></i>Record Payment
+          </a>
+        </div>
+      </div>
+
+      {% if recent_payments %}
+      <div style="overflow-x:auto;">
+        <table class="fin-table">
+          <thead>
+            <tr>
+              <th>Receipt No.</th>
+              <th>Student</th>
+              <th>Grade</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Date</th>
+              <th>Received By</th>
+              <th>Balance After</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payment in recent_payments %}
+            <tr>
+
+              <!-- Receipt number — monospace font for readability -->
+              <td>
+                <span style="font-family:monospace;font-size:.8rem;
+                             color:#3b7ddd;font-weight:600;">
+                  {{ payment.receipt_number }}
+                </span>
+              </td>
+
+              <!-- Student name + avatar -->
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="avatar">
+                    {{ payment.finance.student.student_name|first|upper }}
+                  </div>
+                  <span style="font-weight:500;white-space:nowrap;">
+                    {{ payment.finance.student.student_name }}
+                  </span>
+                </div>
+              </td>
+
+              <!-- Grade -->
+              <td style="font-size:.82rem;">
+                {{ payment.finance.student.grade_level.name }}
+              </td>
+
+              <!-- Amount paid in this transaction -->
+              <td>
+                <span style="font-weight:600;color:#065f46;">
+                  L${{ payment.amount|floatformat:0 }}
+                </span>
+              </td>
+
+              <!-- Payment method badge -->
+              <td>
+                {% if payment.payment_method == 'cash' %}
+                  <span class="badge" style="background:#f0fdf4;color:#166534;font-size:.7rem;padding:3px 8px;">
+                    <i class="bi bi-cash me-1"></i>Cash
+                  </span>
+                {% elif payment.payment_method == 'transfer' %}
+                  <span class="badge" style="background:#eff4ff;color:#1d4ed8;font-size:.7rem;padding:3px 8px;">
+                    <i class="bi bi-bank me-1"></i>Transfer
+                  </span>
+                {% elif payment.payment_method == 'pos' %}
+                  <span class="badge" style="background:#fdf4ff;color:#7e22ce;font-size:.7rem;padding:3px 8px;">
+                    <i class="bi bi-credit-card me-1"></i>POS
+                  </span>
+                {% else %}
+                  <span class="badge" style="background:#fef3c7;color:#92400e;font-size:.7rem;padding:3px 8px;">
+                    <i class="bi bi-file-text me-1"></i>Cheque
+                  </span>
+                {% endif %}
+              </td>
+
+              <!-- Date -->
+              <td style="font-size:.82rem;">{{ payment.date }}</td>
+
+              <!-- Received by -->
+              <td style="font-size:.82rem;color:#6c757d;">
+                {{ payment.received_by }}
+              </td>
+
+              <!-- Current balance on the Finance record -->
+              <td>
+                <span style="font-size:.82rem;font-weight:600;
+                  color:{% if payment.finance.payment_status == 'fully_paid' %}
+                    #065f46{% else %}#dc2626{% endif %};">
+                  L${{ payment.finance.balance|floatformat:0 }}
+                </span>
+              </td>
+
+              <!-- View receipt link -->
+              <td>
+                <a href="{% url 'school:receipt' payment.receipt_number %}"
+                   class="update-link"
+                   target="_blank">
+                  <i class="bi bi-receipt me-1"></i>Receipt
+                </a>
+              </td>
+
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-cash-coin" style="font-size:1.75rem;opacity:.3;"></i>
+        <p class="mt-2 mb-0" style="font-size:.85rem;">
+          No payment transactions recorded yet.
+          <a href="/admin/school/paymenttransaction/add/" style="color:#3b7ddd;">
+            Record the first payment →
+          </a>
+        </p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
 
           <!-- Search bar
                Hidden inputs carry the current sort so search doesn't reset it -->
@@ -854,7 +1037,127 @@
       </div>
     </div><!-- /enrollment row -->
 
+  <!-- =========================================================
+      AUDIT LOG — Recent Activity Feed
+  ========================================================== -->
+  <div class="section-heading">Activity Log</div>
+  <div class="row g-3 mb-4">
+    <div class="col-12">
+      <div class="panel-card">
 
+        <div class="panel-header">
+          <h6>
+            <i class="bi bi-shield-check me-2" style="color:#6366f1;"></i>
+            Recent System Activity
+            <span class="badge ms-1"
+              style="background:#eef2ff;color:#4338ca;font-size:.72rem;padding:3px 8px;">
+              Last 20 actions
+            </span>
+          </h6>
+          <div class="d-flex gap-3 align-items-center">
+            <span style="font-size:.78rem;color:#6c757d;">
+              Today:
+              <strong style="color:#4338ca;">
+                {{ audit_today }} action{{ audit_today|pluralize }}
+              </strong>
+            </span>
+            <a href="/admin/school/auditlog/"
+              style="font-size:.75rem;padding:4px 12px;border:1px solid #e9ecef;
+                      border-radius:6px;color:#6c757d;text-decoration:none;">
+              Full Log
+            </a>
+          </div>
+        </div>
+
+        {% if recent_activity %}
+        <div style="padding:.5rem 0;">
+          {% for entry in recent_activity %}
+          <div style="display:flex;gap:14px;padding:.7rem 1.25rem;
+                      border-bottom:1px solid #f1f5f9;align-items:flex-start;
+                      transition:background .1s;"
+              onmouseover="this.style.background='#fafbff'"
+              onmouseout="this.style.background=''">
+
+            <!-- Action icon circle -->
+            <div style="width:34px;height:34px;border-radius:50%;flex-shrink:0;
+                        display:flex;align-items:center;justify-content:center;font-size:.9rem;
+                        {% if entry.action == 'create'  %}background:#dcfce7;color:#166534;
+                        {% elif entry.action == 'update'%}background:#dbeafe;color:#1d4ed8;
+                        {% elif entry.action == 'delete'%}background:#fee2e2;color:#991b1b;
+                        {% elif entry.action == 'payment'%}background:#f0fdf4;color:#065f46;
+                        {% else %}background:#f3f4f6;color:#374151;{% endif %}">
+              {% if entry.action == 'create'  %}<i class="bi bi-plus-lg"></i>
+              {% elif entry.action == 'update'%}<i class="bi bi-pencil-fill"></i>
+              {% elif entry.action == 'delete'%}<i class="bi bi-trash-fill"></i>
+              {% elif entry.action == 'payment'%}<i class="bi bi-cash-coin"></i>
+              {% else %}<i class="bi bi-info-circle-fill"></i>
+              {% endif %}
+            </div>
+
+            <!-- Description + metadata -->
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:.845rem;color:#1e293b;
+                          line-height:1.45;margin-bottom:3px;">
+                {{ entry.description }}
+              </div>
+              <div style="font-size:.75rem;color:#94a3b8;
+                          display:flex;gap:12px;flex-wrap:wrap;">
+
+                <!-- Who did it -->
+                <span>
+                  <i class="bi bi-person-fill me-1"></i>
+                  {% if entry.user %}
+                    {{ entry.user.get_full_name|default:entry.user.username }}
+                  {% else %}
+                    System
+                  {% endif %}
+                </span>
+
+                <!-- Which model -->
+                <span>
+                  <i class="bi bi-database-fill me-1"></i>
+                  {{ entry.model_name }}
+                </span>
+
+                <!-- When -->
+                <span>
+                  <i class="bi bi-clock me-1"></i>
+                  {{ entry.timestamp|date:"M j, Y" }}
+                  at {{ entry.timestamp|date:"g:i A" }}
+                </span>
+
+              </div>
+            </div>
+
+            <!-- Action badge -->
+            <div style="flex-shrink:0;">
+              <span style="font-size:.7rem;font-weight:600;padding:3px 9px;
+                          border-radius:20px;
+                          {% if entry.action == 'create'  %}background:#dcfce7;color:#166534;
+                          {% elif entry.action == 'update'%}background:#dbeafe;color:#1d4ed8;
+                          {% elif entry.action == 'delete'%}background:#fee2e2;color:#991b1b;
+                          {% elif entry.action == 'payment'%}background:#f0fdf4;color:#065f46;
+                          {% else %}background:#f3f4f6;color:#374151;{% endif %}">
+                {{ entry.get_action_display }}
+              </span>
+            </div>
+
+          </div>
+          {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-shield-check" style="font-size:1.75rem;opacity:.3;"></i>
+          <p class="mt-2 mb-0" style="font-size:.85rem;">
+            No activity recorded yet — actions will appear here automatically
+          </p>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
     <!-- Footer -->
     <div class="text-center pt-2 pb-4" style="font-size:.78rem;color:#adb5bd;">
       EduOversight &mdash; Proprietor's Remote School Oversight System &mdash; || Built by; D. Solomon K. Youhn || {{ today }}

@@ -1,0 +1,186 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Receipt {{ object.receipt_number }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    body { background:#f4f6f9; font-family:'Segoe UI',sans-serif; }
+    .receipt-wrap {
+      max-width:520px; margin:2rem auto;
+      background:#fff; border-radius:16px;
+      border:1px solid #e9ecef; overflow:hidden;
+    }
+    .receipt-header {
+      background:#1a2235; color:#fff;
+      padding:1.5rem; text-align:center;
+    }
+    .receipt-header .school-name {
+      font-size:1.1rem; font-weight:700; margin-bottom:.25rem;
+    }
+    .receipt-header .receipt-no {
+      font-size:.85rem; color:rgba(255,255,255,.6);
+      font-family:monospace; letter-spacing:.05em;
+    }
+    .receipt-body { padding:1.5rem; }
+    .info-row {
+      display:flex; justify-content:space-between;
+      padding:.55rem 0; border-bottom:1px solid #f0f2f5;
+      font-size:.875rem;
+    }
+    .info-row:last-child { border-bottom:none; }
+    .info-row .label { color:#6c757d; }
+    .info-row .value { font-weight:500; color:#1a2235; text-align:right; }
+    .amount-box {
+      background:#f0fdf4; border:1px solid #bbf7d0;
+      border-radius:10px; padding:1.1rem; text-align:center; margin:1.25rem 0;
+    }
+    .amount-box .amount-label {
+      font-size:.75rem; text-transform:uppercase;
+      letter-spacing:.06em; color:#166534; margin-bottom:.35rem;
+    }
+    .amount-box .amount-value {
+      font-size:2rem; font-weight:700; color:#065f46;
+    }
+    .balance-box {
+      border-radius:10px; padding:.9rem 1.1rem;
+      display:flex; justify-content:space-between;
+      align-items:center; margin-bottom:1.25rem;
+      font-size:.875rem;
+    }
+    .balance-box.has-balance {
+      background:#fff5f5; border:1px solid #ffd5d5;
+    }
+    .balance-box.no-balance {
+      background:#f0fdf4; border:1px solid #bbf7d0;
+    }
+    .receipt-footer {
+      background:#f8f9fa; padding:1rem 1.5rem;
+      text-align:center; font-size:.75rem; color:#6c757d;
+      border-top:1px dashed #dee2e6;
+    }
+    .print-btn {
+      display:flex; gap:10px; justify-content:center;
+      margin:1.25rem 0 .25rem;
+    }
+    @media print {
+      body { background:#fff; }
+      .print-btn { display:none; }
+      .receipt-wrap { border:none; box-shadow:none; margin:0; max-width:100%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="receipt-wrap">
+
+  <!-- Header -->
+  <div class="receipt-header">
+    <div class="school-name">
+      <i class="bi bi-mortarboard-fill me-2"></i>EduOversight
+    </div>
+    <div style="font-size:.78rem;color:rgba(255,255,255,.5);margin-bottom:.75rem;">
+      Official Payment Receipt
+    </div>
+    <div class="receipt-no">{{ object.receipt_number }}</div>
+  </div>
+
+  <!-- Body -->
+  <div class="receipt-body">
+
+    <!-- Amount paid (big green box) -->
+    <div class="amount-box">
+      <div class="amount-label">Amount Received</div>
+      <div class="amount-value">L${{ object.amount|floatformat:2 }}</div>
+    </div>
+
+    <!-- Student & payment details -->
+    <div class="info-row">
+      <span class="label">Student Name</span>
+      <span class="value">{{ object.finance.student.student_name }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Grade Level</span>
+      <span class="value">{{ object.finance.student.grade_level.name }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Payment Date</span>
+      <span class="value">{{ object.date }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Payment Method</span>
+      <span class="value">{{ object.get_payment_method_display }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Received By</span>
+      <span class="value">{{ object.received_by }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Total Fees Due</span>
+      <span class="value">L${{ object.finance.total_fees_due|floatformat:2 }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Total Paid to Date</span>
+      <span class="value" style="color:#065f46;">
+        L${{ object.finance.amount_paid|floatformat:2 }}
+      </span>
+    </div>
+
+    {% if object.notes %}
+    <div class="info-row">
+      <span class="label">Notes</span>
+      <span class="value">{{ object.notes }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Outstanding balance box -->
+    {% with balance=object.finance.balance %}
+    <div class="balance-box {% if balance == 0 %}no-balance{% else %}has-balance{% endif %}">
+      <span style="font-weight:600;">
+        {% if balance == 0 %}
+          <i class="bi bi-check-circle-fill me-2" style="color:#065f46;"></i>
+          Fully Paid
+        {% else %}
+          <i class="bi bi-exclamation-circle-fill me-2" style="color:#991b1b;"></i>
+          Outstanding Balance
+        {% endif %}
+      </span>
+      <span style="font-weight:700;font-size:1rem;
+        color:{% if balance == 0 %}#065f46{% else %}#991b1b{% endif %};">
+        L${{ balance|floatformat:2 }}
+      </span>
+    </div>
+    {% endwith %}
+
+    <!-- Print / Back buttons -->
+    <div class="print-btn">
+      <button onclick="window.print()"
+              style="background:#1a2235;color:#fff;border:none;
+                     border-radius:8px;padding:8px 20px;
+                     font-size:.85rem;cursor:pointer;">
+        <i class="bi bi-printer-fill me-2"></i>Print Receipt
+      </button>
+      <a href="/"
+         style="background:#f4f6f9;color:#1a2235;border:1px solid #e9ecef;
+                border-radius:8px;padding:8px 20px;
+                font-size:.85rem;text-decoration:none;">
+        <i class="bi bi-arrow-left me-2"></i>Dashboard
+      </a>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="receipt-footer">
+    Generated on {{ object.created_at|date:"N j, Y, g:i a" }}
+    &nbsp;·&nbsp;
+    This is an official receipt. Please keep for your records.
+  </div>
+
+</div>
+
+</body>
+</html>
