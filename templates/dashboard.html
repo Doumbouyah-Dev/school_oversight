@@ -197,6 +197,26 @@
     </div>
   </div>
   <div class="nav-label">Overview</div>
+
+{% if current_term %}
+<div style="margin:.5rem 1.25rem .25rem;background:rgba(99,102,241,.15);
+            border-radius:8px;padding:.6rem .85rem;
+            border:1px solid rgba(99,102,241,.25);">
+  <div style="font-size:.65rem;color:rgba(255,255,255,.5);
+              text-transform:uppercase;letter-spacing:.07em;
+              margin-bottom:2px;">
+    Active Term
+  </div>
+  <div style="font-size:.8rem;color:#fff;font-weight:600;
+              line-height:1.3;">
+    {{ current_term }}
+  </div>
+  <div style="font-size:.7rem;color:rgba(255,255,255,.45);
+              margin-top:2px;">
+    {{ current_term.progress_percent }}% complete
+  </div>
+</div>
+{% endif %}
   <a href="/" class="nav-link active"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
   <div class="nav-label">Modules</div>
   <a href="/admin/school/student/"        class="nav-link"><i class="bi bi-people-fill"></i> Students</a>
@@ -254,6 +274,121 @@
 
   <div class="dashboard-body">
 
+<!-- =========================================================
+     DATE RANGE FILTER BAR
+     Sticks to the top of the dashboard body.
+     All preset buttons and the custom date picker live here.
+========================================================== -->
+<div style="background:#fff;border-radius:12px;border:1px solid #e9ecef;
+            padding:.85rem 1.25rem;margin-bottom:1.25rem;
+            display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+
+  <!-- Filter icon + label -->
+  <div style="display:flex;align-items:center;gap:6px;
+              font-size:.8rem;font-weight:600;color:#64748b;
+              flex-shrink:0;">
+    <i class="bi bi-funnel-fill" style="color:#3b7ddd;"></i>
+    Date Filter:
+  </div>
+
+  <!-- Preset buttons -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    {% for preset_val, preset_lbl in range_form.preset.field.choices %}
+    {% if preset_val %}
+    <a href="?preset={{ preset_val }}{% if finance_search %}&finance_search={{ finance_search }}{% endif %}{% if sort_by %}&sort={{ sort_by }}&dir={{ sort_dir }}{% endif %}{% if viewed_term %}&term={{ viewed_term.pk }}{% endif %}"
+       style="font-size:.76rem;padding:4px 12px;border-radius:20px;
+              text-decoration:none;transition:all .15s;
+              {% if active_preset == preset_val %}
+                background:#3b7ddd;color:#fff;border:1px solid #3b7ddd;
+              {% else %}
+                background:#f8faff;color:#3b7ddd;border:1px solid #dbeafe;
+              {% endif %}">
+      {{ preset_lbl }}
+    </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Divider -->
+  <div style="width:1px;height:24px;background:#e9ecef;
+              flex-shrink:0;"></div>
+
+  <!-- Custom date range form -->
+  <form method="GET" action=""
+        style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+
+    {# Preserve other active params #}
+    {% if finance_search %}
+    <input type="hidden" name="finance_search"
+           value="{{ finance_search }}">
+    {% endif %}
+    {% if sort_by %}
+    <input type="hidden" name="sort" value="{{ sort_by }}">
+    <input type="hidden" name="dir"  value="{{ sort_dir }}">
+    {% endif %}
+    {% if viewed_term %}
+    <input type="hidden" name="term" value="{{ viewed_term.pk }}">
+    {% endif %}
+
+    <input type="hidden" name="preset" value="">
+
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:.76rem;color:#64748b;white-space:nowrap;">
+        From
+      </label>
+      <input type="date"
+             name="date_from"
+             value="{{ date_from|date:'Y-m-d' }}"
+             style="font-size:.78rem;padding:4px 8px;
+                    border:1px solid #e2e8f0;border-radius:6px;
+                    color:#334155;background:#fff;">
+    </div>
+
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-size:.76rem;color:#64748b;white-space:nowrap;">
+        To
+      </label>
+      <input type="date"
+             name="date_to"
+             value="{{ date_to|date:'Y-m-d' }}"
+             style="font-size:.78rem;padding:4px 8px;
+                    border:1px solid #e2e8f0;border-radius:6px;
+                    color:#334155;background:#fff;">
+    </div>
+
+    <button type="submit"
+            style="font-size:.78rem;padding:5px 14px;
+                   background:#3b7ddd;color:#fff;border:none;
+                   border-radius:6px;cursor:pointer;">
+      Apply
+    </button>
+
+  </form>
+
+  <!-- Active range display + clear button -->
+  <div style="margin-left:auto;display:flex;align-items:center;
+              gap:8px;flex-shrink:0;">
+    <span style="font-size:.76rem;background:#f0f7ff;
+                 color:#1d4ed8;padding:4px 12px;border-radius:20px;
+                 border:1px solid #dbeafe;white-space:nowrap;">
+      <i class="bi bi-calendar3 me-1"></i>
+      <strong>{{ range_label }}</strong>:
+      {{ date_from }} → {{ date_to }}
+    </span>
+    {% if active_preset or request.GET.date_from %}
+    <a href="?"
+       style="font-size:.76rem;color:#dc3545;text-decoration:none;
+              padding:4px 10px;border:1px solid #fecaca;
+              border-radius:20px;background:#fff5f5;
+              white-space:nowrap;">
+      <i class="bi bi-x me-1"></i>Clear
+    </a>
+    {% endif %}
+  </div>
+
+</div><!-- /filter bar -->
+
+
     <!-- =========================================================
          1. URGENT EXPULSION ALERTS
     ========================================================== -->
@@ -294,6 +429,275 @@
       </div>
     </div>
     {% endif %}
+
+    <!-- =========================================================
+     DATE RANGE SUMMARY CARDS
+     Shows metrics scoped to the selected date range.
+========================================================== -->
+<div class="section-heading">
+  Summary for
+  <span style="color:#3b7ddd;font-weight:700;
+               text-transform:none;letter-spacing:0;">
+    {{ range_label }}
+  </span>
+</div>
+
+<div class="row g-3 mb-4">
+
+  <!-- Collected in range -->
+  <div class="col-6 col-xl-3">
+    <div style="background:#fff;border-radius:12px;
+                padding:1.1rem 1.25rem;border:1px solid #e9ecef;
+                border-left:4px solid #22c55e;">
+      <div style="font-size:.7rem;text-transform:uppercase;
+                  letter-spacing:.06em;color:#6c757d;
+                  font-weight:600;margin-bottom:.4rem;">
+        <i class="bi bi-cash-coin me-1" style="color:#22c55e;"></i>
+        Collected
+      </div>
+      <div style="font-size:1.4rem;font-weight:700;color:#065f46;">
+        L${{ range_collected|floatformat:0 }}
+      </div>
+      <div style="font-size:.75rem;color:#6c757d;margin-top:.25rem;">
+        {{ range_payment_count }}
+        payment{{ range_payment_count|pluralize }}
+        in period
+      </div>
+    </div>
+  </div>
+
+  <!-- Discipline incidents in range -->
+  <div class="col-6 col-xl-3">
+    <div style="background:#fff;border-radius:12px;
+                padding:1.1rem 1.25rem;border:1px solid #e9ecef;
+                border-left:4px solid #f97316;">
+      <div style="font-size:.7rem;text-transform:uppercase;
+                  letter-spacing:.06em;color:#6c757d;
+                  font-weight:600;margin-bottom:.4rem;">
+        <i class="bi bi-exclamation-triangle me-1"
+           style="color:#f97316;"></i>
+        Discipline
+      </div>
+      <div style="font-size:1.4rem;font-weight:700;color:#9a3412;">
+        {{ range_discipline_count }}
+      </div>
+      <div style="font-size:.75rem;color:#6c757d;margin-top:.25rem;">
+        incident{{ range_discipline_count|pluralize }}
+        in period
+      </div>
+    </div>
+  </div>
+
+  <!-- Events in range -->
+  <div class="col-6 col-xl-3">
+    <div style="background:#fff;border-radius:12px;
+                padding:1.1rem 1.25rem;border:1px solid #e9ecef;
+                border-left:4px solid #6366f1;">
+      <div style="font-size:.7rem;text-transform:uppercase;
+                  letter-spacing:.06em;color:#6c757d;
+                  font-weight:600;margin-bottom:.4rem;">
+        <i class="bi bi-calendar-event me-1"
+           style="color:#6366f1;"></i>
+        Events
+      </div>
+      <div style="font-size:1.4rem;font-weight:700;color:#3730a3;">
+        {{ range_event_count }}
+      </div>
+      <div style="font-size:.75rem;color:#6c757d;margin-top:.25rem;">
+        event{{ range_event_count|pluralize }} scheduled
+      </div>
+    </div>
+  </div>
+
+  <!-- New enrollments in range -->
+  <div class="col-6 col-xl-3">
+    <div style="background:#fff;border-radius:12px;
+                padding:1.1rem 1.25rem;border:1px solid #e9ecef;
+                border-left:4px solid #3b7ddd;">
+      <div style="font-size:.7rem;text-transform:uppercase;
+                  letter-spacing:.06em;color:#6c757d;
+                  font-weight:600;margin-bottom:.4rem;">
+        <i class="bi bi-person-plus me-1" style="color:#3b7ddd;"></i>
+        New Students
+      </div>
+      <div style="font-size:1.4rem;font-weight:700;color:#1e40af;">
+        {{ new_enrollments }}
+      </div>
+      <div style="font-size:.75rem;color:#6c757d;margin-top:.25rem;">
+        enrolled in period
+      </div>
+    </div>
+  </div>
+
+</div><!-- /range summary cards -->
+
+
+<!-- Daily collections mini-chart (7 bars) -->
+{% if daily_collections %}
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="panel-card">
+      <div class="panel-header">
+        <h6>
+          <i class="bi bi-bar-chart-fill me-2"
+             style="color:#22c55e;"></i>
+          Daily Collections — Last 7 Days
+        </h6>
+        <span style="font-size:.78rem;color:#6c757d;">
+          L${{ range_collected|floatformat:0 }} total
+          over {{ range_payment_count }}
+          payment{{ range_payment_count|pluralize }}
+        </span>
+      </div>
+      <div class="panel-body">
+        <div style="display:flex;align-items:flex-end;gap:8px;
+                    height:80px;padding-top:.5rem;">
+          {% for day in daily_collections %}
+          {% with max_val=1 %}
+          <div style="flex:1;display:flex;flex-direction:column;
+                      align-items:center;gap:4px;">
+            <!-- Bar -->
+            <div style="width:100%;border-radius:4px 4px 0 0;
+                        min-height:4px;
+                        background:{% if day.total > 0 %}#3b7ddd{% else %}#f1f5f9{% endif %};
+                        height:{% if day.total > 0 %}60px{% else %}4px{% endif %};"
+                 title="L${{ day.total }}">
+            </div>
+            <!-- Amount label -->
+            <div style="font-size:.6rem;color:#94a3b8;
+                        text-align:center;white-space:nowrap;">
+              {% if day.total > 0 %}
+                L${{ day.total|floatformat:0 }}
+              {% else %}
+                —
+              {% endif %}
+            </div>
+            <!-- Date label -->
+            <div style="font-size:.62rem;color:#64748b;
+                        text-align:center;white-space:nowrap;">
+              {{ day.date }}
+            </div>
+          </div>
+          {% endwith %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- Range-filtered discipline breakdown -->
+{% if range_discipline_count > 0 %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-5">
+    <div class="panel-card">
+      <div class="panel-header">
+        <h6>
+          <i class="bi bi-pie-chart-fill me-2"
+             style="color:#f97316;"></i>
+          Discipline Breakdown
+          <span style="font-size:.75rem;font-weight:400;
+                       color:#94a3b8;text-transform:none;
+                       letter-spacing:0;margin-left:.4rem;">
+            {{ range_label }}
+          </span>
+        </h6>
+      </div>
+      <div class="panel-body">
+        {% for item in discipline_breakdown %}
+        <div style="display:flex;justify-content:space-between;
+                    align-items:center;padding:.5rem 0;
+                    border-bottom:1px solid #f1f5f9;
+                    font-size:.845rem;">
+          <span style="color:#334155;">
+            {% if item.action_taken == 'expulsion' %}
+              <i class="bi bi-x-circle-fill me-2"
+                 style="color:#dc3545;"></i>
+            {% elif item.action_taken == 'suspension' %}
+              <i class="bi bi-pause-circle-fill me-2"
+                 style="color:#f97316;"></i>
+            {% elif item.action_taken == 'detention' %}
+              <i class="bi bi-clock-fill me-2"
+                 style="color:#f59e0b;"></i>
+            {% else %}
+              <i class="bi bi-info-circle-fill me-2"
+                 style="color:#94a3b8;"></i>
+            {% endif %}
+            {{ item.action_taken|title }}
+          </span>
+          <span style="font-weight:700;color:#1e293b;">
+            {{ item.count }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Range events list -->
+  <div class="col-12 col-lg-7">
+    <div class="panel-card">
+      <div class="panel-header">
+        <h6>
+          <i class="bi bi-calendar3 me-2"
+             style="color:#6366f1;"></i>
+          Events in Period
+        </h6>
+        <span class="badge"
+          style="background:#eef2ff;color:#4338ca;
+                 font-size:.72rem;padding:3px 8px;">
+          {{ range_event_count }}
+        </span>
+      </div>
+      <div class="panel-body">
+        {% if range_events %}
+          {% for event in range_events %}
+          <div class="event-item">
+            {% if event.event_type == 'test' %}
+              <span class="event-dot"
+                    style="background:#dc3545;"></span>
+            {% elif event.event_type == 'trip' %}
+              <span class="event-dot"
+                    style="background:#3b7ddd;"></span>
+            {% elif event.event_type == 'revision' %}
+              <span class="event-dot"
+                    style="background:#22c55e;"></span>
+            {% else %}
+              <span class="event-dot"
+                    style="background:#f59e0b;"></span>
+            {% endif %}
+            <div style="flex:1;">
+              <div class="event-name">{{ event.event_name }}</div>
+              <div class="event-meta">
+                {{ event.start_date }}
+                &nbsp;·&nbsp;
+                {{ event.get_event_type_display }}
+                &nbsp;·&nbsp;
+                <span class="badge rounded-pill
+                             status-{{ event.status }}">
+                  {{ event.get_status_display }}
+                </span>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-center py-3 text-muted">
+            <i class="bi bi-calendar-x"
+               style="font-size:1.5rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0" style="font-size:.84rem;">
+              No events in this period
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 
 
     <!-- =========================================================
@@ -345,6 +749,297 @@
       </div>
 
     </div><!-- /metric cards -->
+
+
+<!-- =========================================================
+     TERM STATUS PANEL
+========================================================== -->
+{% if current_term %}
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="panel-card">
+      <div class="panel-header">
+        <h6>
+          <i class="bi bi-calendar2-week-fill me-2"
+             style="color:#6366f1;"></i>
+          Academic Term Status
+        </h6>
+
+        <!-- Term selector dropdown -->
+        <div class="d-flex align-items-center gap-2">
+          <form method="GET" action=""
+                style="display:flex;align-items:center;gap:6px;">
+            {# Preserve other GET params #}
+            {% if finance_search %}
+            <input type="hidden" name="finance_search"
+                   value="{{ finance_search }}">
+            {% endif %}
+            <select name="term"
+                    onchange="this.form.submit()"
+                    style="font-size:.8rem;padding:4px 10px;
+                           border:1px solid #e2e8f0;border-radius:6px;
+                           color:#334155;background:#fff;">
+              <option value="">— Current Term —</option>
+              {% for t in all_terms %}
+              <option value="{{ t.pk }}"
+                {% if viewed_term.pk == t.pk %}selected{% endif %}>
+                {{ t }} ({{ t.get_status_display }})
+              </option>
+              {% endfor %}
+            </select>
+          </form>
+
+          <a href="/admin/school/termrecord/"
+             style="font-size:.75rem;padding:4px 10px;
+                    border:1px solid #e9ecef;border-radius:6px;
+                    color:#6c757d;text-decoration:none;">
+            Manage Terms
+          </a>
+        </div>
+      </div>
+
+      <div class="panel-body">
+        <div class="row g-3 align-items-center">
+
+          <!-- Term name + status badge -->
+          <div class="col-12 col-md-3">
+            <div style="font-size:.75rem;color:#94a3b8;
+                        text-transform:uppercase;letter-spacing:.06em;
+                        margin-bottom:.3rem;">
+              Current Term
+            </div>
+            <div style="font-size:1.05rem;font-weight:700;
+                        color:#1e293b;margin-bottom:.4rem;">
+              {{ current_term }}
+            </div>
+            <span style="font-size:.75rem;font-weight:600;
+                         padding:3px 10px;border-radius:20px;
+                         {% if current_term.status == 'active' %}
+                           background:#dcfce7;color:#166534;
+                         {% elif current_term.status == 'closed' %}
+                           background:#fee2e2;color:#991b1b;
+                         {% else %}
+                           background:#f3f4f6;color:#374151;
+                         {% endif %}">
+              {{ current_term.get_status_display }}
+            </span>
+          </div>
+
+          <!-- Term progress bar -->
+          <div class="col-12 col-md-5">
+            <div style="display:flex;justify-content:space-between;
+                        font-size:.78rem;color:#64748b;margin-bottom:6px;">
+              <span>
+                <i class="bi bi-calendar3 me-1"></i>
+                {{ current_term.start_date }}
+              </span>
+              <span style="font-weight:600;color:#1e293b;">
+                {{ term_progress }}% complete
+              </span>
+              <span>
+                {{ current_term.end_date }}
+                <i class="bi bi-calendar3 ms-1"></i>
+              </span>
+            </div>
+            <div style="background:#f1f5f9;border-radius:6px;
+                        height:12px;overflow:hidden;">
+              <div style="height:100%;border-radius:6px;
+                transition:width .8s ease;
+                background:{% if term_progress < 70 %}#22c55e
+                           {% elif term_progress < 90 %}#f59e0b
+                           {% else %}#ef4444{% endif %};
+                width:{{ term_progress }}%;">
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;
+                        font-size:.75rem;color:#94a3b8;margin-top:5px;">
+              <span>{{ term_weeks_total }} weeks total</span>
+              <span style="color:{% if term_weeks_left > 4 %}#22c55e
+                           {% elif term_weeks_left > 2 %}#f59e0b
+                           {% else %}#ef4444{% endif %};font-weight:600;">
+                {{ term_weeks_left }} weeks remaining
+              </span>
+            </div>
+          </div>
+
+          <!-- Quick stats -->
+          <div class="col-12 col-md-4">
+            <div style="display:grid;grid-template-columns:1fr 1fr;
+                        gap:10px;">
+
+              <div style="background:#f8faff;border-radius:8px;
+                          padding:.65rem .85rem;
+                          border:1px solid #e8eeff;">
+                <div style="font-size:.68rem;color:#6366f1;
+                            font-weight:600;text-transform:uppercase;
+                            letter-spacing:.05em;margin-bottom:2px;">
+                  Results
+                </div>
+                <div style="font-size:1.1rem;font-weight:700;
+                            color:#1e293b;">
+                  {{ total_results }}
+                </div>
+                <div style="font-size:.7rem;color:#94a3b8;">
+                  entered this term
+                </div>
+              </div>
+
+              <div style="background:#f0fdf4;border-radius:8px;
+                          padding:.65rem .85rem;
+                          border:1px solid #bbf7d0;">
+                <div style="font-size:.68rem;color:#166534;
+                            font-weight:600;text-transform:uppercase;
+                            letter-spacing:.05em;margin-bottom:2px;">
+                  Avg Score
+                </div>
+                <div style="font-size:1.1rem;font-weight:700;
+                            color:#065f46;">
+                  {{ overall_avg }}%
+                </div>
+                <div style="font-size:.7rem;color:#94a3b8;">
+                  school average
+                </div>
+              </div>
+
+              <div style="background:#fff9f0;border-radius:8px;
+                          padding:.65rem .85rem;
+                          border:1px solid #fed7aa;">
+                <div style="font-size:.68rem;color:#9a3412;
+                            font-weight:600;text-transform:uppercase;
+                            letter-spacing:.05em;margin-bottom:2px;">
+                  Events Left
+                </div>
+                <div style="font-size:1.1rem;font-weight:700;
+                            color:#9a3412;">
+                  {{ term_events_remaining }}
+                </div>
+                <div style="font-size:.7rem;color:#94a3b8;">
+                  this term
+                </div>
+              </div>
+
+              <div style="background:#fff5f5;border-radius:8px;
+                          padding:.65rem .85rem;
+                          border:1px solid #fecaca;">
+                <div style="font-size:.68rem;color:#991b1b;
+                            font-weight:600;text-transform:uppercase;
+                            letter-spacing:.05em;margin-bottom:2px;">
+                  Unpaid
+                </div>
+                <div style="font-size:1.1rem;font-weight:700;
+                            color:#991b1b;">
+                  {{ term_unpaid_count }}
+                </div>
+                <div style="font-size:.7rem;color:#94a3b8;">
+                  students this term
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div><!-- /row -->
+
+        <!-- Term notes (if any) -->
+        {% if current_term.term_notes %}
+        <div style="margin-top:1rem;padding:.75rem 1rem;
+                    background:#fffbeb;border-radius:8px;
+                    border:1px solid #fde68a;font-size:.84rem;
+                    color:#78350f;">
+          <i class="bi bi-info-circle-fill me-2"
+             style="color:#d97706;"></i>
+          {{ current_term.term_notes }}
+        </div>
+        {% endif %}
+
+        <!-- Term comparison selector -->
+        <div style="margin-top:1rem;padding-top:1rem;
+                    border-top:1px solid #f1f5f9;
+                    display:flex;align-items:center;gap:10px;
+                    flex-wrap:wrap;">
+          <span style="font-size:.8rem;color:#64748b;font-weight:500;">
+            Compare with:
+          </span>
+          <form method="GET" action=""
+                style="display:flex;align-items:center;gap:6px;">
+            {% if finance_search %}
+            <input type="hidden" name="finance_search"
+                   value="{{ finance_search }}">
+            {% endif %}
+            {% if viewed_term %}
+            <input type="hidden" name="term"
+                   value="{{ viewed_term.pk }}">
+            {% endif %}
+            <select name="compare"
+                    onchange="this.form.submit()"
+                    style="font-size:.8rem;padding:4px 10px;
+                           border:1px solid #e2e8f0;border-radius:6px;
+                           color:#334155;background:#fff;">
+              <option value="">— Select a term to compare —</option>
+              {% for t in all_terms %}
+              {% if t.pk != viewed_term.pk %}
+              <option value="{{ t.pk }}"
+                {% if compare_term.pk == t.pk %}selected{% endif %}>
+                {{ t }}
+              </option>
+              {% endif %}
+              {% endfor %}
+            </select>
+          </form>
+
+          {% if compare_term %}
+          <!-- Show comparison result inline -->
+          <div style="display:flex;align-items:center;gap:8px;
+                      background:#f8f9fa;padding:5px 12px;
+                      border-radius:8px;border:1px solid #e9ecef;
+                      font-size:.82rem;">
+            <span style="color:#64748b;">
+              {{ compare_term }} avg:
+            </span>
+            <strong style="color:#1e293b;">{{ compare_avg }}%</strong>
+            <span style="color:#64748b;">vs</span>
+            <strong style="color:#1e293b;">{{ overall_avg }}%</strong>
+            <span style="color:#64748b;">now</span>
+            {% if overall_avg > compare_avg %}
+              <span style="color:#065f46;font-weight:700;">
+                ▲ +{{ overall_avg|floatformat:1 }}
+              </span>
+            {% elif overall_avg < compare_avg %}
+              <span style="color:#dc2626;font-weight:700;">
+                ▼ -{{ compare_avg|floatformat:1 }}
+              </span>
+            {% else %}
+              <span style="color:#64748b;">= No change</span>
+            {% endif %}
+          </div>
+          {% endif %}
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div><!-- /term status panel -->
+
+{% else %}
+<!-- No active term — gentle nudge -->
+<div class="alert" style="background:#fffbeb;border:1px solid #fde68a;
+     border-radius:10px;padding:.85rem 1.1rem;margin-bottom:1.25rem;
+     font-size:.875rem;color:#78350f;display:flex;
+     align-items:center;gap:10px;">
+  <i class="bi bi-exclamation-triangle-fill"
+     style="font-size:1.1rem;color:#d97706;flex-shrink:0;"></i>
+  <div>
+    <strong>No active term set.</strong>
+    Academic results and term finance data will not show until
+    a term is activated.
+    <a href="/admin/school/termrecord/"
+       style="color:#d97706;font-weight:600;margin-left:4px;">
+      Set up a term →
+    </a>
+  </div>
+</div>
+{% endif %}
 
 
     <!-- =========================================================
@@ -1036,6 +1731,511 @@
         </div>
       </div>
     </div><!-- /enrollment row -->
+
+
+<!-- =========================================================
+     ACADEMIC RESULTS SECTION
+========================================================== -->
+<div class="section-heading">
+  Academic Performance
+  {% if current_term %}
+    <span style="font-size:.75rem;font-weight:400;color:#94a3b8;
+                 text-transform:none;letter-spacing:0;margin-left:.5rem;">
+      — {{ current_term }}
+    </span>
+  {% endif %}
+</div>
+
+{% if not current_term %}
+<!-- No current term set — guide the user -->
+<div class="panel-card mb-4">
+  <div class="panel-body text-center py-4">
+    <i class="bi bi-calendar-x"
+       style="font-size:2rem;color:#94a3b8;"></i>
+    <p class="mt-2 mb-1" style="font-weight:600;color:#1e293b;">
+      No active term found
+    </p>
+    <p class="mb-3" style="font-size:.85rem;color:#6c757d;">
+      Set up a Term Record and mark it as current to
+      see academic results here.
+    </p>
+    <a href="/admin/school/termrecord/add/"
+       style="background:#3b7ddd;color:#fff;padding:8px 20px;
+              border-radius:8px;text-decoration:none;font-size:.85rem;">
+      <i class="bi bi-plus-lg me-2"></i>Create Term Record
+    </a>
+  </div>
+</div>
+
+{% else %}
+
+<!-- ── Row A: Academic metric cards ── -->
+<div class="row g-3 mb-4">
+
+  <!-- Total Results -->
+  <div class="col-6 col-xl-3">
+    <div class="metric-card blue">
+      <div class="icon-wrap" style="background:#eff4ff;color:#3b7ddd;">
+        <i class="bi bi-journal-text"></i>
+      </div>
+      <div class="metric-value">{{ total_results }}</div>
+      <div class="metric-label">Results Entered</div>
+      <div class="metric-sub">{{ current_term }}</div>
+    </div>
+  </div>
+
+  <!-- Overall Average -->
+  <div class="col-6 col-xl-3">
+    <div class="metric-card
+      {% if overall_avg >= 70 %}green
+      {% elif overall_avg >= 50 %}orange
+      {% else %}red{% endif %}">
+      <div class="icon-wrap"
+        style="background:{% if overall_avg >= 70 %}#f0fdf4;color:#28a745;
+               {% elif overall_avg >= 50 %}#fff7ed;color:#fd7e14;
+               {% else %}#fff5f5;color:#dc3545;{% endif %}">
+        <i class="bi bi-graph-up"></i>
+      </div>
+      <div class="metric-value">{{ overall_avg }}%</div>
+      <div class="metric-label">School Average</div>
+      <div class="metric-sub">
+        {% if overall_avg >= 70 %}Excellent performance
+        {% elif overall_avg >= 50 %}Average performance
+        {% else %}Needs improvement{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Passing students -->
+  <div class="col-6 col-xl-3">
+    <div class="metric-card green">
+      <div class="icon-wrap" style="background:#f0fdf4;color:#28a745;">
+        <i class="bi bi-check-circle-fill"></i>
+      </div>
+      <div class="metric-value">{{ passing_results }}</div>
+      <div class="metric-label">Passing Results</div>
+      <div class="metric-sub">Score ≥ 40 (Grade D and above)</div>
+    </div>
+  </div>
+
+  <!-- Flagged / Failing -->
+  <div class="col-6 col-xl-3">
+    <div class="metric-card red">
+      <div class="icon-wrap" style="background:#fff5f5;color:#dc3545;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+      </div>
+      <div class="metric-value">{{ failing_results }}</div>
+      <div class="metric-label">Failing Results</div>
+      <div class="metric-sub">Score below 40 — needs attention</div>
+    </div>
+  </div>
+
+</div><!-- /academic metric cards -->
+
+
+<!-- ── Row B: Grade distribution + Top performers ── -->
+<div class="row g-3 mb-4">
+
+  <!-- Grade Distribution -->
+  <div class="col-12 col-lg-5">
+    <div class="panel-card h-100">
+      <div class="panel-header">
+        <h6>
+          <i class="bi bi-bar-chart-steps me-2"
+             style="color:#6366f1;"></i>
+          Grade Distribution
+        </h6>
+        <span style="font-size:.78rem;color:#6c757d;">
+          {{ total_results }} result{{ total_results|pluralize }}
+        </span>
+      </div>
+      <div class="panel-body">
+
+        {% for grade, label, bg, color, bar_color in grade_bars %}
+        {% empty %}
+
+        {# We build the grade bars with template data since
+           grade_dist_dict is a plain Python dict #}
+        {% endfor %}
+
+        {# Build each grade bar manually using grade_dist_dict #}
+
+        <!-- A Grade -->
+        {% with count=grade_dist_dict.A|default:0 %}
+        <div style="margin-bottom:.85rem;">
+          <div style="display:flex;justify-content:space-between;
+                      margin-bottom:4px;font-size:.82rem;">
+            <span>
+              <span style="display:inline-block;width:22px;height:22px;
+                           border-radius:6px;background:#dcfce7;color:#166534;
+                           text-align:center;font-weight:700;font-size:.78rem;
+                           line-height:22px;margin-right:6px;">A</span>
+              Excellent (70–100)
+            </span>
+            <span style="font-weight:600;color:#166534;">{{ count }}</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
+            <div style="height:100%;border-radius:4px;background:#22c55e;
+              width:{% if total_results > 0 %}{% widthratio count total_results 100 %}%{% else %}0%{% endif %};
+              transition:width .6s ease;"></div>
+          </div>
+        </div>
+        {% endwith %}
+
+        <!-- B Grade -->
+        {% with count=grade_dist_dict.B|default:0 %}
+        <div style="margin-bottom:.85rem;">
+          <div style="display:flex;justify-content:space-between;
+                      margin-bottom:4px;font-size:.82rem;">
+            <span>
+              <span style="display:inline-block;width:22px;height:22px;
+                           border-radius:6px;background:#dbeafe;color:#1d4ed8;
+                           text-align:center;font-weight:700;font-size:.78rem;
+                           line-height:22px;margin-right:6px;">B</span>
+              Very Good (60–69)
+            </span>
+            <span style="font-weight:600;color:#1d4ed8;">{{ count }}</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
+            <div style="height:100%;border-radius:4px;background:#3b82f6;
+              width:{% if total_results > 0 %}{% widthratio count total_results 100 %}%{% else %}0%{% endif %};
+              transition:width .6s ease;"></div>
+          </div>
+        </div>
+        {% endwith %}
+
+        <!-- C Grade -->
+        {% with count=grade_dist_dict.C|default:0 %}
+        <div style="margin-bottom:.85rem;">
+          <div style="display:flex;justify-content:space-between;
+                      margin-bottom:4px;font-size:.82rem;">
+            <span>
+              <span style="display:inline-block;width:22px;height:22px;
+                           border-radius:6px;background:#fef3c7;color:#92400e;
+                           text-align:center;font-weight:700;font-size:.78rem;
+                           line-height:22px;margin-right:6px;">C</span>
+              Good (50–59)
+            </span>
+            <span style="font-weight:600;color:#92400e;">{{ count }}</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
+            <div style="height:100%;border-radius:4px;background:#f59e0b;
+              width:{% if total_results > 0 %}{% widthratio count total_results 100 %}%{% else %}0%{% endif %};
+              transition:width .6s ease;"></div>
+          </div>
+        </div>
+        {% endwith %}
+
+        <!-- D Grade -->
+        {% with count=grade_dist_dict.D|default:0 %}
+        <div style="margin-bottom:.85rem;">
+          <div style="display:flex;justify-content:space-between;
+                      margin-bottom:4px;font-size:.82rem;">
+            <span>
+              <span style="display:inline-block;width:22px;height:22px;
+                           border-radius:6px;background:#fff7ed;color:#9a3412;
+                           text-align:center;font-weight:700;font-size:.78rem;
+                           line-height:22px;margin-right:6px;">D</span>
+              Pass (40–49)
+            </span>
+            <span style="font-weight:600;color:#9a3412;">{{ count }}</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
+            <div style="height:100%;border-radius:4px;background:#f97316;
+              width:{% if total_results > 0 %}{% widthratio count total_results 100 %}%{% else %}0%{% endif %};
+              transition:width .6s ease;"></div>
+          </div>
+        </div>
+        {% endwith %}
+
+        <!-- F Grade -->
+        {% with count=grade_dist_dict.F|default:0 %}
+        <div style="margin-bottom:0;">
+          <div style="display:flex;justify-content:space-between;
+                      margin-bottom:4px;font-size:.82rem;">
+            <span>
+              <span style="display:inline-block;width:22px;height:22px;
+                           border-radius:6px;background:#fee2e2;color:#991b1b;
+                           text-align:center;font-weight:700;font-size:.78rem;
+                           line-height:22px;margin-right:6px;">F</span>
+              Fail (0–39)
+            </span>
+            <span style="font-weight:600;color:#991b1b;">{{ count }}</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:8px;overflow:hidden;">
+            <div style="height:100%;border-radius:4px;background:#ef4444;
+              width:{% if total_results > 0 %}{% widthratio count total_results 100 %}%{% else %}0%{% endif %};
+              transition:width .6s ease;"></div>
+          </div>
+        </div>
+        {% endwith %}
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Top 5 Performers -->
+  <div class="col-12 col-lg-7">
+    <div class="panel-card h-100">
+      <div class="panel-header">
+        <h6>
+          <i class="bi bi-trophy-fill me-2" style="color:#f59e0b;"></i>
+          Top Performers
+        </h6>
+        <span style="font-size:.78rem;color:#6c757d;">
+          Highest average score
+        </span>
+      </div>
+      <div class="panel-body" style="padding:0;">
+        {% if top_performers %}
+        <table class="fin-table">
+          <thead>
+            <tr>
+              <th style="width:40px;">Rank</th>
+              <th>Student</th>
+              <th>Grade</th>
+              <th>Avg Score</th>
+              <th>Performance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for student in top_performers %}
+            <tr>
+              <!-- Rank with medal for top 3 -->
+              <td style="text-align:center;font-weight:700;">
+                {% if forloop.counter == 1 %}
+                  <span style="color:#f59e0b;font-size:1.1rem;">&#127947;</span>
+                {% elif forloop.counter == 2 %}
+                  <span style="color:#94a3b8;font-size:1.1rem;">&#129352;</span>
+                {% elif forloop.counter == 3 %}
+                  <span style="color:#b45309;font-size:1.1rem;">&#129353;</span>
+                {% else %}
+                  <span style="color:#64748b;">{{ forloop.counter }}</span>
+                {% endif %}
+              </td>
+              <!-- Name + avatar -->
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="avatar">
+                    {{ student.student_name|first|upper }}
+                  </div>
+                  <span style="font-weight:500;">
+                    {{ student.student_name }}
+                  </span>
+                </div>
+              </td>
+              <!-- Grade level -->
+              <td style="font-size:.82rem;">
+                {{ student.grade_level.name }}
+              </td>
+              <!-- Average score -->
+              <td>
+                <span style="font-weight:700;font-size:.9rem;
+                  color:{% if student.avg_score >= 70 %}#065f46
+                        {% elif student.avg_score >= 50 %}#92400e
+                        {% else %}#991b1b{% endif %};">
+                  {{ student.avg_score|floatformat:1 }}%
+                </span>
+              </td>
+              <!-- Visual bar -->
+              <td style="min-width:100px;">
+                <div style="background:#f1f5f9;border-radius:4px;
+                            height:8px;overflow:hidden;">
+                  <div style="height:100%;border-radius:4px;
+                    background:{% if student.avg_score >= 70 %}#22c55e
+                               {% elif student.avg_score >= 50 %}#f59e0b
+                               {% else %}#ef4444{% endif %};
+                    width:{{ student.avg_score|floatformat:0 }}%;
+                    transition:width .6s ease;">
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+          <i class="bi bi-trophy"
+             style="font-size:1.75rem;opacity:.3;"></i>
+          <p class="mt-2 mb-0" style="font-size:.85rem;">
+            No results entered yet for {{ current_term }}
+          </p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grade dist + top performers -->
+
+
+<!-- ── Row C: Subject averages + Flagged students ── -->
+<div class="row g-3 mb-4">
+
+  <!-- Subject Averages -->
+  <div class="col-12 col-lg-6">
+    <div class="panel-card">
+      <div class="panel-header">
+        <h6>
+          <i class="bi bi-book-fill me-2" style="color:#6366f1;"></i>
+          Subject Performance
+        </h6>
+        <a href="/admin/school/result/"
+           style="font-size:.75rem;padding:4px 12px;
+                  border:1px solid #e9ecef;border-radius:6px;
+                  color:#6c757d;text-decoration:none;">
+          Enter Results
+        </a>
+      </div>
+      <div class="panel-body">
+        {% if subject_averages %}
+          {% for subj in subject_averages %}
+          <div style="margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;
+                        align-items:center;margin-bottom:4px;">
+              <div>
+                <span style="font-size:.845rem;font-weight:500;
+                             color:#1e293b;">
+                  {{ subj.name }}
+                </span>
+                <span style="font-size:.72rem;color:#94a3b8;
+                             margin-left:6px;">
+                  {{ subj.total_students }} student{{ subj.total_students|pluralize }}
+                </span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                {% if subj.fail_count > 0 %}
+                <span style="font-size:.7rem;background:#fee2e2;
+                             color:#991b1b;padding:2px 7px;
+                             border-radius:10px;">
+                  {{ subj.fail_count }} failing
+                </span>
+                {% endif %}
+                <span style="font-weight:700;font-size:.875rem;
+                  color:{% if subj.avg_score >= 70 %}#065f46
+                        {% elif subj.avg_score >= 50 %}#92400e
+                        {% else %}#991b1b{% endif %};">
+                  {{ subj.avg_score|floatformat:1 }}%
+                </span>
+              </div>
+            </div>
+            <div style="background:#f1f5f9;border-radius:4px;
+                        height:8px;overflow:hidden;">
+              <div style="height:100%;border-radius:4px;
+                background:{% if subj.avg_score >= 70 %}#22c55e
+                           {% elif subj.avg_score >= 50 %}#f59e0b
+                           {% else %}#ef4444{% endif %};
+                width:{{ subj.avg_score|floatformat:0 }}%;
+                transition:width .6s ease;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-book"
+               style="font-size:1.75rem;opacity:.3;"></i>
+            <p class="mt-2 mb-0" style="font-size:.85rem;">
+              No subject results yet
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Flagged / At-Risk Students -->
+  <div class="col-12 col-lg-6">
+    <div class="panel-card">
+      <div class="panel-header" style="background:#fff9f0;
+           border-bottom-color:#fed7aa;">
+        <h6 style="color:#9a3412;">
+          <i class="bi bi-flag-fill me-2"></i>
+          At-Risk Students
+          {% if flagged_students %}
+          <span class="badge ms-1"
+            style="background:#fed7aa;color:#9a3412;
+                   font-size:.7rem;padding:3px 8px;">
+            {{ flagged_students|length }} flagged
+          </span>
+          {% endif %}
+        </h6>
+        <span style="font-size:.75rem;color:#9a3412;">
+          Failing 1+ subject
+        </span>
+      </div>
+      <div class="panel-body" style="padding:0;">
+        {% if flagged_students %}
+        <table class="fin-table">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Grade</th>
+              <th>Fails</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for student in flagged_students %}
+            <tr>
+              <!-- Student name -->
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div class="avatar"
+                       style="background:#fff5f5;color:#dc3545;">
+                    {{ student.student_name|first|upper }}
+                  </div>
+                  <div>
+                    <div style="font-weight:500;font-size:.845rem;">
+                      {{ student.student_name }}
+                    </div>
+                    <div style="font-size:.72rem;color:#94a3b8;">
+                      {{ student.get_gender_display }}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <!-- Grade -->
+              <td style="font-size:.82rem;">
+                {{ student.grade_level.name }}
+              </td>
+              <!-- Number of failing subjects -->
+              <td>
+                <span style="background:#fee2e2;color:#991b1b;
+                             font-size:.75rem;font-weight:700;
+                             padding:3px 9px;border-radius:20px;">
+                  {{ student.fail_count }}
+                  subject{{ student.fail_count|pluralize }}
+                </span>
+              </td>
+              <!-- Link to student in admin -->
+              <td>
+                <a href="/admin/school/student/{{ student.pk }}/change/"
+                   class="update-link"
+                   style="font-size:.75rem;">
+                  View
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+          <i class="bi bi-patch-check-fill"
+             style="font-size:1.75rem;color:#22c55e;opacity:.6;"></i>
+          <p class="mt-2 mb-0" style="font-size:.85rem;">
+            No at-risk students this term
+          </p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div><!-- /subject averages + flagged -->
+
+{% endif %}{# end if current_term #}
 
   <!-- =========================================================
       AUDIT LOG — Recent Activity Feed

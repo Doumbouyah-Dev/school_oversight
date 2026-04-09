@@ -1,3 +1,527 @@
+ADMIN.PY 
+# school/admin.py
+
+from django.contrib import admin
+from django.utils.html import format_html
+from django.db.models import Sum
+from .models import (
+    GradeLevel,
+    Student,
+    Finance,
+    PaymentTransaction,
+    AcademicCalendar,
+    Discipline, Subject, 
+    TermRecord, Result  
+)
+
+
+# =============================================================
+# GRADE LEVEL ADMIN
+# Set up grades here FIRST before adding any students.
+# =============================================================
+
+@admin.register(GradeLevel)
+class GradeLevelAdmin(admin.ModelAdmin):
+    list_display  = ['name', 'formatted_tuition', 'description', 'order', 'student_count']
+    list_editable = ['order']
+    search_fields = ['name']
+    ordering      = ['order', 'name']
+
+    def formatted_tuition(self, obj):
+        amount = '{:,.2f}'.format(float(obj.tuition_fee))
+        return format_html('<strong style="color:#198754;">L${}</strong>', amount)
+    formatted_tuition.short_description = "Tuition Fee"
+
+    def student_count(self, obj):
+        count = obj.students.filter(is_active=True).count()
+        return format_html(
+            '<span style="background:#e8f4f8;padding:2px 8px;border-radius:10px;">'
+            '{} student{}</span>',
+            count, 's' if count != 1 else ''
+        )
+    student_count.short_description = "Active Students"
+
+
+# =============================================================
+# RESULT INLINE — Defined BEFORE StudentAdmin so it can be referenced
+# =============================================================
+
+class ResultInline(admin.TabularInline):
+    """
+    Show all results for a student directly inside the
+    Student admin page.
+    """
+    model         = Result
+    extra         = 0
+    readonly_fields = ['total_score', 'letter_grade', 'remark']
+    fields        = [
+        'subject', 'term_record',
+        'ca_score', 'exam_score',
+        'total_score', 'letter_grade', 'remark'
+    ]
+
+
+# =============================================================
+# STUDENT ADMIN
+# =============================================================
+
+@admin.register(Student)
+class StudentAdmin(admin.ModelAdmin):
+    list_display  = [
+        'student_name', 'gender', 'grade_level',
+        'is_active', 'date_enrolled', 'finance_status'
+    ]
+    list_filter   = ['is_active', 'grade_level', 'gender']
+    search_fields = ['student_name']
+    list_editable = ['is_active']
+    inlines       = [ResultInline]
+
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('student_name', 'gender')
+        }),
+        ('Enrollment', {
+            'fields': ('grade_level', 'is_active'),
+            'description': (
+                'Selecting a Grade Level will automatically create or update '
+                "the student's Finance record with the correct tuition fee."
+            )
+        }),
+    )
+
+    def finance_status(self, obj):
+        try:
+            status = obj.finance.payment_status
+            colors = {
+                'fully_paid': ('#d1fae5', '#065f46', 'Fully Paid'),
+                'partial':    ('#fef3c7', '#92400e', 'Partial'),
+                'unpaid':     ('#fee2e2', '#991b1b', 'Unpaid'),
+            }
+            bg, color, label = colors.get(status, ('#f3f4f6', '#374151', status))
+            return format_html(
+                '<span style="background:{};color:{};padding:2px 10px;'
+                'border-radius:10px;font-size:.78em;">{}</span>',
+                bg, color, label
+            )
+        except Exception:
+            return format_html('<span style="color:#9ca3af;">No record</span>')
+    finance_status.short_description = "Fee Status"
+
+@admin.register(Result)
+class ResultAdmin(admin.ModelAdmin):
+    list_display  = [
+        'student_name', 'grade_level', 'subject',
+        'term_record', 'ca_score', 'exam_score',
+        'total_score', 'grade_badge', 'remark_display'
+    ]
+    list_filter   = [
+        'term_record', 'subject',
+        'letter_grade', 'student__grade_level'
+    ]
+    search_fields = ['student__student_name', 'subject__name']
+    readonly_fields = ['total_score', 'letter_grade', 'remark']
+
+    fieldsets = (
+        ('Student & Term', {
+            'fields': ('student', 'subject', 'term_record')
+        }),
+        ('Scores', {
+            'fields': ('ca_score', 'exam_score'),
+            'description': 'CA: max 0 marks. Exam: max 99 marks. Total = CA + Exam.'
+        }),
+        ('Computed Results (auto)', {
+            'fields': ('total_score', 'letter_grade', 'remark'),
+        }),
+    )
+
+    def student_name(self, obj):
+        return obj.student.student_name
+    student_name.short_description = "Student"
+    student_name.admin_order_field = 'student__student_name'
+
+    def grade_level(self, obj):
+        return obj.student.grade_level.name
+    grade_level.short_description = "Grade"
+
+    def grade_badge(self, obj):
+        colors = {
+            'A': ('#dcfce7', '#166534'),
+            'B': ('#dbeafe', '#1d4ed8'),
+            'C': ('#fef3c7', '#92400e'),
+            'D': ('#fff7ed', '#9a3412'),
+            'F': ('#fee2e2', '#991b1b'),
+        }
+        bg, color = colors.get(obj.letter_grade, ('#f3f4f6', '#374151'))
+        return format_html(
+            '<span style="background:{};color:{};padding:3px 10px;'
+            'border-radius:10px;font-size:.8em;font-weight:700;">'
+            '{}</span>',
+            bg, color, obj.letter_grade
+        )
+    grade_badge.short_description = "Grade"
+
+    def remark_display(self, obj):
+        return obj.get_remark_display()
+    remark_display.short_description = "Remark"
+    remark_display.admin_order_field = 'remark'
+
+
+# =============================================================
+# PAYMENT TRANSACTION INLINE
+# Defined BEFORE FinanceAdmin so it can be referenced inside it.
+# =============================================================
+
+class PaymentTransactionInline(admin.TabularInline):
+    """
+    Shows all payment transactions directly inside the Finance
+    edit page — the Bursar sees the full payment history without
+    navigating away, and adds new payments from the same page.
+    """
+    model           = PaymentTransaction
+    extra           = 1
+    readonly_fields = ['receipt_number', 'created_at']
+    fields          = [
+        'receipt_number', 'amount', 'date',
+        'received_by', 'payment_method', 'notes'
+    ]
+
+    def get_readonly_fields(self, request, obj=None):
+        return ['receipt_number', 'created_at']
+
+
+# =============================================================
+# FINANCE ADMIN
+# Comes AFTER PaymentTransactionInline — order matters.
+# =============================================================
+
+@admin.register(Finance)
+class FinanceAdmin(admin.ModelAdmin):
+    list_display  = [
+        'student', 'grade_level_name', 'formatted_due',
+        'formatted_paid', 'formatted_balance',
+        'payment_status', 'transaction_count', 'last_payment_date'
+    ]
+    list_filter   = ['payment_status', 'student__grade_level']
+    search_fields = ['student__student_name']
+
+    # These fields are auto-managed — staff must not edit them directly
+    readonly_fields = [
+        'total_fees_due', 'payment_status',
+        'amount_paid', 'balance_display'
+    ]
+
+    # PaymentTransactionInline is now defined above — no NameError
+    inlines = [PaymentTransactionInline]
+
+    fieldsets = (
+        ('Student', {
+            'fields': ('student',)
+        }),
+        ('Fee Summary (read-only — updated automatically)', {
+            'fields': ('total_fees_due', 'amount_paid', 'payment_status', 'balance_display'),
+            'description': (
+                'These fields are calculated automatically from payment '
+                'transactions below. Add a new transaction row to record a payment.'
+            )
+        }),
+        ('Last Payment', {
+            'fields': ('last_payment_date',),
+        }),
+    )
+
+    def grade_level_name(self, obj):
+        return obj.student.grade_level.name
+    grade_level_name.short_description = "Grade"
+
+    def formatted_due(self, obj):
+        amount = '{:,.2f}'.format(float(obj.total_fees_due))
+        return format_html('L${}', amount)
+    formatted_due.short_description = "Fees Due"
+
+    def formatted_paid(self, obj):
+        amount = '{:,.2f}'.format(float(obj.amount_paid))
+        color  = '#065f46' if obj.amount_paid >= obj.total_fees_due else '#92400e'
+        return format_html('<strong style="color:{};">L${}</strong>', color, amount)
+    formatted_paid.short_description = "Amount Paid"
+
+    def formatted_balance(self, obj):
+        bal    = float(obj.balance())
+        amount = '{:,.2f}'.format(bal)
+        color  = '#065f46' if bal == 0 else '#991b1b'
+        return format_html('<span style="color:{};">L${}</span>', color, amount)
+    formatted_balance.short_description = "Balance"
+
+    def balance_display(self, obj):
+        bal    = float(obj.balance())
+        amount = '{:,.2f}'.format(bal)
+        return format_html(
+            '<strong style="font-size:1.1em;color:{};">L${}</strong>',
+            '#065f46' if bal == 0 else '#dc2626', amount
+        )
+    balance_display.short_description = "Outstanding Balance"
+    
+    def transaction_count(self, obj):
+        count = obj.transactions.count()
+        return format_html(
+            '<span style="background:#eff4ff;color:#1d4ed8;padding:2px 8px;'
+            'border-radius:10px;font-size:.78em;">{} payment{}</span>',
+            count, 's' if count != 1 else ''
+        )
+    transaction_count.short_description = "Payments"
+
+    def balance_display(self, obj):
+        if not obj.pk:
+            return '—'
+        bal    = float(obj.balance())
+        amount = '{:,.2f}'.format(bal)
+        return format_html(
+            '<strong style="font-size:1.1em;color:{};">L${}</strong>',
+            '#065f46' if bal == 0 else '#dc2626', amount
+        )
+    balance_display.short_description = "Outstanding Balance"
+# =============================================================
+# PAYMENT TRANSACTION ADMIN (standalone — full list view)
+# =============================================================
+
+@admin.register(PaymentTransaction)
+class PaymentTransactionAdmin(admin.ModelAdmin):
+    list_display    = [
+        'receipt_number', 'student_name', 'amount_display',
+        'payment_method', 'date', 'received_by'
+    ]
+    list_filter     = ['payment_method', 'date', 'received_by']
+    search_fields   = [
+        'receipt_number',
+        'finance__student__student_name',
+        'received_by'
+    ]
+    readonly_fields = ['receipt_number', 'created_at']
+    date_hierarchy  = 'date'
+
+    fieldsets = (
+        ('Receipt', {
+            'fields': ('receipt_number', 'created_at')
+        }),
+        ('Payment Details', {
+            'fields': ('finance', 'amount', 'date', 'payment_method')
+        }),
+        ('Collected By', {
+            'fields': ('received_by', 'notes')
+        }),
+    )
+
+    def student_name(self, obj):
+        return obj.finance.student.student_name
+    student_name.short_description = "Student"
+    student_name.admin_order_field = 'finance__student__student_name'
+
+    def amount_display(self, obj):
+        amount = '{:,.2f}'.format(float(obj.amount))
+        return format_html('<strong style="color:#065f46;">L${}</strong>', amount)
+    amount_display.short_description = "Amount"
+    amount_display.admin_order_field = 'amount'
+
+# =============================================================
+# ACADEMIC CALENDAR ADMIN
+# =============================================================
+
+@admin.register(AcademicCalendar)
+class AcademicCalendarAdmin(admin.ModelAdmin):
+    list_display  = ['event_name', 'event_type', 'start_date', 'end_date', 'status']
+    list_filter   = ['event_type', 'status']
+    search_fields = ['event_name']
+    fieldsets = (
+        ('Event Details', {
+            'fields': ('event_name', 'event_type', 'description')
+        }),
+        ('Schedule', {
+            'fields': ('start_date', 'end_date', 'status')
+        }),
+    )
+
+
+# =============================================================
+# DISCIPLINE ADMIN
+# =============================================================
+
+@admin.register(Discipline)
+class DisciplineAdmin(admin.ModelAdmin):
+    list_display  = ['student', 'action_taken', 'date', 'issued_by']
+    list_filter   = ['action_taken', 'date']
+    search_fields = ['student__student_name', 'reason']
+    
+
+
+# =============================================================
+# AUDIT LOG ADMIN
+# A read-only log of all create/update/delete actions across the system,
+# =============================================================
+
+
+from .models import (
+    GradeLevel, Student, Finance, PaymentTransaction,
+    AcademicCalendar, Discipline, AuditLog
+)
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    """
+    Read-only audit log in the admin.
+    Nobody can add/edit/delete entries — it's a tamper-resistant record.
+    """
+    list_display  = [
+        'timestamp_display', 'user', 'action_badge',
+        'model_name', 'object_repr_short', 'description_short'
+    ]
+    list_filter   = ['action', 'model_name', 'user', 'timestamp']
+    search_fields = ['description', 'object_repr', 'user__username']
+    date_hierarchy = 'timestamp'
+    readonly_fields = [
+        'user', 'action', 'model_name', 'object_id',
+        'object_repr', 'description', 'ip_address', 'timestamp'
+    ]
+
+    # Nobody can add/change/delete audit logs from the admin
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Only superusers can delete old audit records
+        return request.user.is_superuser
+
+    def timestamp_display(self, obj):
+        return format_html(
+            '<span style="font-size:.8rem;color:#6c757d;font-family:monospace;">'
+            '{}</span>',
+            obj.timestamp.strftime('%b %d, %Y %H:%M')
+        )
+    timestamp_display.short_description = "When"
+    timestamp_display.admin_order_field = 'timestamp'
+
+    def action_badge(self, obj):
+        colors = {
+            'create':  ('#dcfce7', '#166534'),
+            'update':  ('#dbeafe', '#1d4ed8'),
+            'delete':  ('#fee2e2', '#991b1b'),
+            'payment': ('#f0fdf4', '#065f46'),
+            'login':   ('#f3f4f6', '#374151'),
+        }
+        bg, color = colors.get(obj.action, ('#f3f4f6', '#374151'))
+        return format_html(
+            '<span style="background:{};color:{};padding:2px 8px;'
+            'border-radius:10px;font-size:.72em;font-weight:600;">'
+            '{}</span>',
+            bg, color, obj.get_action_display()
+        )
+    action_badge.short_description = "Action"
+
+    def object_repr_short(self, obj):
+        return (
+            obj.object_repr[:40] + '…'
+            if len(obj.object_repr) > 40
+            else obj.object_repr
+        )
+    object_repr_short.short_description = "Record"
+
+    def description_short(self, obj):
+        return (
+            obj.description[:80] + '…'
+            if len(obj.description) > 80
+            else obj.description
+        )
+    description_short.short_description = "Description"
+
+# =============================================================
+# SUBJECT ADMIN
+# =============================================================
+
+@admin.register(Subject)
+class SubjectAdmin(admin.ModelAdmin):
+    list_display  = ['name', 'code', 'is_core', 'grade_count', 'result_count']
+    list_filter   = ['is_core', 'grade_levels']
+    list_editable = ['is_core']
+    search_fields = ['name', 'code']
+    filter_horizontal = ['grade_levels']   # Nice dual-list widget
+
+    def grade_count(self, obj):
+        count = obj.grade_levels.count()
+        return format_html(
+            '<span style="background:#eff4ff;color:#1d4ed8;'
+            'padding:2px 8px;border-radius:10px;font-size:.78em;">'
+            '{} grade{}</span>',
+            count, 's' if count != 1 else ''
+        )
+    grade_count.short_description = "Grades"
+
+    def result_count(self, obj):
+        count = obj.results.count()
+        return f"{count} result{'s' if count != 1 else ''}"
+    result_count.short_description = "Results Entered"
+
+# =============================================================
+# TERM RECORD ADMIN
+# =============================================================
+
+@admin.register(TermRecord)
+class TermRecordAdmin(admin.ModelAdmin):
+    list_display  = [
+        'term', 'session', 'start_date',
+        'end_date', 'is_current', 'result_count'
+    ]
+    list_editable = ['is_current']
+    list_filter   = ['term', 'session', 'is_current']
+
+    fieldsets = (
+        ('Term Details', {
+            'fields': ('term', 'session', 'is_current')
+        }),
+        ('Dates', {
+            'fields': ('start_date', 'end_date')
+        }),
+    )
+
+    def result_count(self, obj):
+        return obj.results.count()
+    result_count.short_description = "Results"
+
+
+# =============================================================
+# RESULT ADMIN — with inline per student
+# =============================================================
+
+class ResultInline(admin.TabularInline):
+    """
+    Show all results for a student directly inside the
+    Student admin page.
+    """
+    model         = Result
+    extra         = 0
+    readonly_fields = ['total_score', 'letter_grade', 'remark']
+    fields        = [
+        'subject', 'term_record',
+        'ca_score', 'exam_score',
+        'total_score', 'letter_grade', 'remark'
+    ]
+k
+k
+k 
+k 
+k 
+k 
+k 
+k 
+k 
+k 
+k 
+k 
+k 
+k 
+keys 
+Models.py
 # school/models.py
 
 from django.db import models
@@ -222,9 +746,9 @@ class Finance(models.Model):
         else:
             return 'partial'
 
-    # def balance(self):
-    #     """How much the student still owes."""
-    #     return self.total_fees_due - self.amount_paid
+    def balance(self):
+        """How much the student still owes."""
+        return self.total_fees_due - self.amount_paid
 
    
 # NEW CLEAN | April 04, 2026 |  the existing clean() method with this updated version:
@@ -597,15 +1121,10 @@ class Subject(models.Model):
 # e.g. "First Term — 2024/2025"
 # =============================================================
 
-# school/models.py — REPLACE existing TermRecord class
-
 class TermRecord(models.Model):
     """
-    Represents one academic term within a session.
-    e.g. "First Term — 2024/2025"
-
-    Only one term can be ACTIVE at a time.
-    Closing a term locks all results for that period.
+    An academic term within a session.
+    Results are always scoped to a TermRecord.
     """
 
     TERM_CHOICES = [
@@ -614,168 +1133,39 @@ class TermRecord(models.Model):
         ('third',  'Third Term'),
     ]
 
-    STATUS_CHOICES = [
-        ('draft',  'Draft — Setting Up'),
-        ('active', 'Active — Current Term'),
-        ('closed', 'Closed — Term Ended'),
-    ]
-
-    term       = models.CharField(max_length=10, choices=TERM_CHOICES)
-    session    = models.CharField(
+    term    = models.CharField(max_length=10, choices=TERM_CHOICES)
+    session = models.CharField(
         max_length=20,
         help_text="Academic session e.g. 2024/2025"
     )
-    status     = models.CharField(
-        max_length=10,
-        choices=STATUS_CHOICES,
-        default='draft',
-        help_text="Only one term should be Active at a time"
+    is_current = models.BooleanField(
+        default=False,
+        help_text="Only one term should be current at a time"
     )
-
-    # Keep is_current as a computed property for backward compatibility
-    # with Feature 4 code — it just checks if status == 'active'
-    @property
-    def is_current(self):
-        return self.status == 'active'
-
     start_date = models.DateField()
     end_date   = models.DateField()
-
-    # Optional: next term's expected start (for planning)
-    next_term_start = models.DateField(
-        null=True, blank=True,
-        help_text="Expected start date of the next term (for planning)"
-    )
-
-    # Remarks shown to staff when they log in during this term
-    term_notes = models.TextField(
-        blank=True,
-        help_text="Notes for staff e.g. exam timetable reminders"
-    )
 
     history = HistoricalRecords()
 
     def save(self, *args, **kwargs):
         """
-        If this term is being set to ACTIVE,
-        set all other terms to CLOSED automatically.
-        Prevents two active terms simultaneously.
+        If this term is being marked as current,
+        unmark all other terms first.
         """
-        if self.status == 'active':
-            TermRecord.objects.exclude(pk=self.pk).filter(
-                status='active'
-            ).update(status='closed')
+        if self.is_current:
+            TermRecord.objects.exclude(pk=self.pk).update(is_current=False)
         super().save(*args, **kwargs)
-
-    def duration_weeks(self):
-        """How many weeks long is this term?"""
-        if self.start_date and self.end_date:
-            delta = self.end_date - self.start_date
-            return round(delta.days / 7, 1)
-        return 0
-
-    def weeks_remaining(self):
-        """How many weeks are left in this term?"""
-        import datetime
-        today = datetime.date.today()
-        if self.end_date and today <= self.end_date:
-            delta = self.end_date - today
-            return round(delta.days / 7, 1)
-        return 0
-    
-    
-
-    def progress_percent(self):
-        """
-        What percentage of this term has elapsed?
-        Used for the term progress bar on the dashboard.
-        """
-        import datetime
-        today = datetime.date.today()
-        if not self.start_date or not self.end_date:
-            return 0
-        total_days   = (self.end_date - self.start_date).days
-        elapsed_days = (today - self.start_date).days
-        if total_days <= 0:
-            return 100
-        percent = (elapsed_days / total_days) * 100
-        return max(0, min(100, round(percent, 1)))
 
     def __str__(self):
         return f"{self.get_term_display()} — {self.session}"
 
     class Meta:
-        ordering        = ['-session', 'term']
+        ordering  = ['-session', 'term']
         unique_together = [['term', 'session']]
-        verbose_name    = "Term Record"
+        verbose_name = "Term Record"
         verbose_name_plural = "Term Records"
 
 
-class TermFinance(models.Model):
-    """
-    Tracks fee payment for a student within a specific term.
-
-    Each time a new term is activated, TermFinance records can be
-    generated for all active students via the admin action.
-    This allows tracking of per-term payment separately from
-    the cumulative Finance record.
-    """
-
-    student    = models.ForeignKey(
-        Student,
-        on_delete=models.CASCADE,
-        related_name='term_finances'
-    )
-    term       = models.ForeignKey(
-        TermRecord,
-        on_delete=models.CASCADE,
-        related_name='student_finances'
-    )
-    fees_due   = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        help_text="Fees due for this specific term"
-    )
-    amount_paid = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0
-    )
-
-    STATUS_CHOICES = [
-        ('fully_paid', 'Fully Paid'),
-        ('partial',    'Partial'),
-        ('unpaid',     'Unpaid'),
-    ]
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='unpaid'
-    )
-
-    history = HistoricalRecords()
-
-
-    @property
-    def balance(self):
-        fees = self.fees_due or 0
-        paid = self.amount_paid or 0
-        return fees - paid
-    
-
-    def __str__(self):
-        return (
-            f"{self.student.student_name} — "
-            f"{self.term} — L${self.amount_paid:,.0f}/"
-            f"L${self.fees_due:,.0f}"
-        )
-
-    class Meta:
-        unique_together = [['student', 'term']]
-        ordering        = ['term', 'student__student_name']
-        verbose_name    = "Term Finance Record"
-        verbose_name_plural = "Term Finance Records"
-        
 # =============================================================
 # RESULT
 # One row = one student's score in one subject in one term.
@@ -823,128 +1213,94 @@ class Result(models.Model):
         related_name='results'
     )
 
-    # ── Score breakdown (Liberian Education System) ──────────────────────────
-    
-    ca_score = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        default=0,
-        verbose_name="Continuous Assessment",
-        help_text="Period tests, quizzes, and projects (Max: 99 points)"
+    # Score breakdown (Nigerian school system)
+    ca_score   = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Continuous Assessment score (out of 40)"
     )
-    
     exam_score = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        default=0,
-        verbose_name="Period Examination",
-        help_text="Final examination for the period/semester (Max: 99 points)"
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Examination score (out of 60)"
     )
 
-    # ── Total, grade, and remark — auto-calculated on save ───────────────────
-    
-    total_score = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2,
-        editable=False, 
-        default=0,
-        verbose_name="Period Average"
+    # Total, grade, and remark — auto-calculated on save
+    total_score  = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        editable=False, default=0
     )
-    
-    # In Liberia, letter grades strictly follow the A, B, C, D, F format
     letter_grade = models.CharField(
-        max_length=2, 
-        choices=GRADE_CHOICES, # Ensure these are updated in your choices tuple
-        editable=False, 
-        blank=True
+        max_length=2, choices=GRADE_CHOICES,
+        editable=False, blank=True
     )
-    
     remark = models.CharField(
-        max_length=20, 
-        choices=REMARK_CHOICES, # e.g., 'Pass', 'Fail', 'Excellent'
-        editable=False, 
-        blank=True
+        max_length=20, choices=REMARK_CHOICES,
+        editable=False, blank=True
     )
 
-    # ── Ranking ──────────────────────────────────────────────────────────────
-    
     position_in_class = models.PositiveIntegerField(
-        null=True, 
-        blank=True,
-        verbose_name="Rank",
-        help_text="Auto-calculated rank for this subject within the class"
+        null=True, blank=True,
+        help_text="Auto-calculated class position for this subject"
     )
+
     history = HistoricalRecords()
 
-    # ── Grade calculation (Liberian Standard) ──────────────────────────
+    # ── Grade calculation ─────────────────────────────────────
 
     @staticmethod
     def compute_grade(total):
         """
-        Liberian MoE / WASSCE Standard Grading Scale:
-        A (Excellent): 90–100
-        B (Very Good): 80–89
-        C (Good): 70–79 
-        D (Pass): 60–69 (In many Liberian schools, 65 or 70 is the passing mark)
-        F (Fail): 0–59
+        Nigerian secondary school grading scale:
+        A = 70–100, B = 60–69, C = 50–59, D = 40–49, F = 0–39
         """
-        if total >= 90:
+        if total >= 70:
             return 'A', 'excellent'
-        elif total >= 80:
-            return 'B', 'very_good'
-        elif total >= 70:
-            return 'C', 'good'
         elif total >= 60:
-            # Note: In Liberia, 60 is often the 'bare minimum' pass. 
-            # Some schools use 70 as the cutoff for passing.
-            return 'D', 'fail' 
+            return 'B', 'very_good'
+        elif total >= 50:
+            return 'C', 'good'
+        elif total >= 40:
+            return 'D', 'pass'
         else:
             return 'F', 'fail'
 
     def clean(self):
-        """Validate score ranges based on 40/60 Liberian Split."""
-        errors = {}
+        """Validate score ranges."""
         if self.ca_score is not None:
-            if not (0 <= self.ca_score <= 99):
-                errors['ca_score'] = 'Continuous Assessment (CA) must be between 0 and 99.'
-        
+            if not (0 <= self.ca_score <= 40):
+                raise ValidationError({
+                    'ca_score': 'CA score must be between 0 and 40.'
+                })
         if self.exam_score is not None:
-            if not (0 <= self.exam_score <= 99):
-                errors['exam_score'] = 'Final Examination score must be between 0 and 99.'
-        
-        if errors:
-            raise ValidationError(errors)
+            if not (0 <= self.exam_score <= 60):
+                raise ValidationError({
+                    'exam_score': 'Exam score must be between 0 and 60.'
+                })
 
     def save(self, *args, **kwargs):
         """
-        Auto-calculate total score, letter grade, and remark.
+        Auto-calculate total score, letter grade, and remark
+        before saving.
         """
-        # Ensure scores aren't None before math to avoid TypeError
-        ca = self.ca_score or 0
-        exam = self.exam_score or 0
-        
-        self.total_score = (ca + exam) / 2  # Average of CA and Exam    
-        self.letter_grade, self.remark = self.compute_grade(float(self.total_score))
-        
-        # We call full_clean to trigger the clean() method before saving
         self.full_clean()
+        self.total_score = self.ca_score + self.exam_score
+        self.letter_grade, self.remark = self.compute_grade(
+            float(self.total_score)
+        )
         super().save(*args, **kwargs)
 
     def __str__(self):
         return (
-            f"{self.student.student_name} | "
-            f"{self.subject.name} | "
-            f"Total: {self.total_score}% ({self.letter_grade})"
+            f"{self.student.student_name} — "
+            f"{self.subject.name} — "
+            f"{self.total_score}/100 ({self.letter_grade})"
         )
-        
-    class Meta:
-        unique_together = [['student', 'subject', 'term_record']]       
-        ordering = ['student__student_name', 'subject__name']    
-        verbose_name = "Academic Result"
-        verbose_name_plural = "Academic Results"
 
-    def __str__(self):
-        return f"{self.student.student_name} - {self.subject.name} ({self.term_record})"
+    class Meta:
+        # One result per student per subject per term
+        unique_together = [['student', 'subject', 'term_record']]
+        ordering        = ['student__student_name', 'subject__name']
+        verbose_name    = "Result"
+        verbose_name_plural = "Results"
 
 # =============================================================
 # AUDIT SIGNALS
@@ -1138,3 +1494,16 @@ def audit_result_save(sender, instance, created, **kwargs):
             f"Term: {instance.term_record}"
         ),
     )
+
+
+
+
+
+
+
+
+
+
+
+
+
